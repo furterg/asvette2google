@@ -10,20 +10,29 @@ Ce script va rechercher la liste des sorties pour chaque activité sur ASVETTE e
 ## Installation
 
 1. Clonez le référentiel GitHub :
+    
+    ```shell
+    git clone https://github.com/furterg/asvette2google.git asvette2google
+    cd asvette2google
+    ```
 
-```shell
-git clone https://github.com/votre-utilisateur/votre-repo.git
-```
-Installez les dépendances à l'aide de pip :
-```shell
-pip install -r requirements.txt
-```
+2. Créer un environment virtuel Python :
+
+    ```shell
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+
+3. Installez les dépendances à l'aide de pip :
+    ```shell
+    pip install -r requirements.txt
+    ```
 
 ## Utilisation
 Exécutez le script en exécutant la commande suivante :
 
 ```shell
-python asvette2google.py
+python3 asvette2google.py
 ```
 
 Le script passera en revue les différentes activités et recherchera les sorties correspondantes sur ASVETTE. Si des sorties sont trouvées, un fichier CSV sera créé pour chaque activité, prêt à être importé dans le calendrier Google.
