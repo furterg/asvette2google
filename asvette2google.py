@@ -7,6 +7,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+from icecream import ic
 
 # List des activités et id ASVETTE correspondant. Le Ski Alpin est exclu.
 activities: dict[str, int] = {
@@ -26,13 +27,13 @@ def timer(func):
         start = time.time()
         result = func(*args, **kwargs)
         end = time.time()
-        print(f"Execution time: {end - start} seconds")
+        ic(f"Execution time: {end - start:.2f} seconds")
         return result
     return wrapper
 
 
 @timer
-def get_events(activity_id) -> pd.DataFrame:
+def get_events(activity_id: int) -> pd.DataFrame:
     """
     Cette fonction va rechercher la liste des sorties pour chaque activité sur ASVETTE et mettre
     les informations dans un DataFrame.
@@ -54,7 +55,6 @@ def get_events(activity_id) -> pd.DataFrame:
 
     # On récupère le tableau des sorties
     table = soup.find("table", {"id": "table_sortie"})
-
     # On récupère les en-têtes du tableau
     headers: list = [header.text.strip() for header in table.find_all("th")]
 
@@ -64,7 +64,6 @@ def get_events(activity_id) -> pd.DataFrame:
         row_data = [cell.text.strip() for cell in row.find_all("td")]
         if row_data:
             rows.append(row_data)
-
     # On transforme le tableau en DataFrame
     df: pd.DataFrame = pd.DataFrame(rows, columns=headers)
     if df.empty:
@@ -76,8 +75,8 @@ def get_events(activity_id) -> pd.DataFrame:
     df['Heure'] = pd.to_datetime(df['Heure'], format='%H:%M', errors='ignore').dt.time
 
     first_char: str = 'Durée_first_char'
-    # On extrait le premier caractère de la colonne 'Durée', qui représente le nombre de jours
-    df[first_char] = df['Durée'].str[0].astype(int)-1
+    # On extrait le nombre de jours de la colonne 'Durée'
+    df[first_char] = df['Durée'].apply(lambda x: int(x.split(' ')[0])-1)
     # On ajoute le nombre de jours pour créer la colonne 'End Date'
     df['End Date'] = df.apply(lambda ligne: ligne['Date'] + pd.DateOffset(days=ligne[first_char]),
                               axis=1)
