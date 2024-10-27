@@ -73,7 +73,7 @@ def get_events(activity_id: int) -> pd.DataFrame:
     # On transforme la colonne 'Date' en datetime
     df['Date'] = pd.to_datetime(df['Date'])
     # On transforme la colonne 'Départ' en datetime
-    df['Heure'] = pd.to_datetime(df['Heure'], format='%H:%M', errors='ignore').dt.time
+    df['Heure'] = pd.to_datetime(df['Heure'], format='%H:%M', errors='coerce').dt.time
 
     first_char: str = 'Durée_first_char'
     # On extrait le nombre de jours de la colonne 'Durée'
