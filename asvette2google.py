@@ -19,6 +19,7 @@ activities: dict[str, int] = {
     'Via Ferrata': 7,
     'Canyoning': 8,
     'Escalade': 9,
+    'Ski de randonnée nordique': 10,
 }
 
 
