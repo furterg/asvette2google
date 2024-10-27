@@ -1,6 +1,6 @@
 """
 Ce script va rechercher la liste des sorties pour chaque activité sur ASVETTE et créé un fichier csv
-à importer dans les calendrier Google correspondant.
+à importer dans les calendriers Google correspondant.
 Le fichier CSV est créé uniquement si un ou plusieurs sorties sont prévues pour l'activité en question.
 """
 
@@ -24,10 +24,10 @@ activities: dict[str, int] = {
 def get_events(activity_id) -> pd.DataFrame:
     """
     Cette fonction va rechercher la liste des sorties pour chaque activité sur ASVETTE et mettre
-    les information dans un DataFrame.
+    les informations dans un DataFrame.
     Si le dataframe est vide, on le retourne directement.
     S'il y a des sorties, on met en forme le Dataframe et on le retourne.
-    :param activity_id: id de l'activité
+    :param activity_id: Id de l'activité
     :type activity_id: integer
     :return: dataframe des sorties
     :rtype: pandas dataframe
@@ -44,7 +44,7 @@ def get_events(activity_id) -> pd.DataFrame:
     # On récupère le tableau des sorties
     table = soup.find("table", {"id": "table_sortie"})
 
-    # On récupère les entetes du tableau
+    # On récupère les en-têtes du tableau
     headers: list = [header.text.strip() for header in table.find_all("th")]
 
     # On récupère les données du tableau
@@ -64,14 +64,14 @@ def get_events(activity_id) -> pd.DataFrame:
     # On transforme la colonne 'Départ' en datetime
     df['Heure'] = pd.to_datetime(df['Heure'], format='%H:%M', errors='ignore').dt.time
 
-    FIRST_CHAR: str = 'Durée_first_char'
-    # On estrait le premier caractère de la colonne 'Durée', qui représente le nombre de jours
-    df[FIRST_CHAR] = df['Durée'].str[0].astype(int)-1
+    first_char: str = 'Durée_first_char'
+    # On extrait le premier caractère de la colonne 'Durée', qui représente le nombre de jours
+    df[first_char] = df['Durée'].str[0].astype(int)-1
     # On ajoute le nombre de jours pour créer la colonne 'End Date'
-    df['End Date'] = df.apply(lambda row: row['Date'] + pd.DateOffset(days=row[FIRST_CHAR]),
+    df['End Date'] = df.apply(lambda ligne: ligne['Date'] + pd.DateOffset(days=ligne[first_char]),
                               axis=1)
     # On supprime la colonne 'Durée_first_char', plus besoin.
-    df = df.drop(FIRST_CHAR, axis=1)
+    df = df.drop(first_char, axis=1)
 
     # On ajoute une colonne 'Description' qui correspond à Difficulté + Encadrant
     df['Description'] = df['Difficulté'] + ' | ' + df['Encadrant']
