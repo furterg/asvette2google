@@ -3,7 +3,7 @@ Ce script va rechercher la liste des sorties pour chaque activité sur ASVETTE e
 à importer dans les calendriers Google correspondant.
 Le fichier CSV est créé uniquement si un ou plusieurs sorties sont prévues pour l'activité en question.
 """
-
+import time
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -21,6 +21,17 @@ activities: dict[str, int] = {
 }
 
 
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        print(f"Execution time: {end - start} seconds")
+        return result
+    return wrapper
+
+
+@timer
 def get_events(activity_id) -> pd.DataFrame:
     """
     Cette fonction va rechercher la liste des sorties pour chaque activité sur ASVETTE et mettre
