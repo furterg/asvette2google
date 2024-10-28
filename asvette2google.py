@@ -184,7 +184,7 @@ def get_asvette_events(activity_id: int) -> pd.DataFrame:
     df['Id'] = df['Id'].apply(lambda x: 'asvette' + 'test' + 'act' + str(activity_id) + 'id' + str(x))  # TODO: Remove 'test' from string
     ic(df.columns)
     ic(df.head(5))
-    df = df.iloc[:1, :]  # TODO: Supprimer cette ligne si on veut afficher toutes les sorties
+    df = df.iloc[:3, :]  # TODO: Supprimer cette ligne si on veut afficher toutes les sorties
     ic(df.iloc[0].to_dict())
     return df
 
@@ -341,9 +341,11 @@ def main() -> None:
         # 2. Recherche des sorties pour l'activité sur Google Calendar
         liste_google_events: pd.DataFrame = get_google_events(service, google_id)
         ic(liste_google_events.iloc[0])
+        # Si aucune sortie ASVETTE, Alors on passe à l'activité suivante
         if liste_sorties.shape[0] == 0:
             print(f"Aucune sortie {activity} de ASVETTE")
             continue
+        # Si aucune sortie Google Calendar, Alors on ajoute les sorties de l'activité ASVETTe
         if liste_google_events is None:
             print(f"Aucune sortie {activity} sur Google Calendar")
             for index, row in liste_sorties.iterrows():
@@ -353,6 +355,17 @@ def main() -> None:
                 ic(event)
                 add_google_event(service, google_id, event)
             continue
+        else:
+            # TODO : on compare les sorties de l'activité ASVETTE avec celles de Google Calendar
+            # On ajoute les sorties de l'activité ASVETTE qui n'existent pas sur Google Calendar
+            # create the code now
+            for index, row in liste_sorties.iterrows():
+                ic(row)
+                ic(row.to_dict())
+                if row['Id'] not in liste_google_events['Id'].values:
+                    event = get_asvette_event_row_dict(row.to_dict())
+                    ic(event)
+                    add_google_event(service, google_id, event)
         # On passe en revue les sorties
         for index, row in liste_sorties.iterrows():
             ic(index)
