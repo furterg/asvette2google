@@ -84,6 +84,23 @@ def get_credentials():
     return creds
 
 
+def get_service(creds: Credentials):
+    """
+    Retourne le service de Google Calendar.
+
+    :param creds: Credentials pour accéder aux APIs Google
+    :type creds: Credentials
+    :return: Service de Google Calendar
+    :rtype: Service
+    """
+    try:
+        service = build("calendar", "v3", credentials=creds)
+    except HttpError as error:
+        print(f"Une erreur s'est produite: {error}")
+        sys.exit(1)
+    return service
+
+
 def get_asvette_events(activity_id: int) -> pd.DataFrame:
     """
     Cette fonction va rechercher la liste des sorties pour chaque activité sur ASVETTE et mettre
@@ -283,40 +300,40 @@ def get_asvette_event_row_dict(asvette: dict) -> dict:
 
 
 def add_google_event(service, google_id: str,event: dict) -> None:
+    """
+    This function adds a new event to a Google Calendar using the Google Calendar API.
+
+    Parameters:
+    service (googleapiclient.discovery.Resource): The Google Calendar API service.
+    google_id (str): The ID of the Google Calendar.
+    event (dict): The event to be added to the Google Calendar.
+
+    Returns:
+    None
+    """
     try:
-        event = service.events().insert(calendarId=google_id, body=event).execute()
-        print('Event created: %s' % (event.get('htmlLink')))
+        event: dict = service.events().insert(calendarId=google_id, body=event).execute()
+        print(f'Événement créé: {event.get("summary")}')
     except HttpError as error:
-        print(f"An error occurred: {error}")
+        print(f"Une erreur s'est produite: {error}")
         sys.exit(1)
 
 
 def update_google_event(service, google_id: str, event: dict) -> None:
-    # google_event = service.events().get(calendarId=google_id, eventId=event['id']).execute()
-    # ic(google_event)
-    # for key in event.keys():
-    #     google_event[key] = event[key]
-    # ic(google_event)
-    updated_event = service.events().update(calendarId=google_id, eventId=event['id'], body=event).execute()
-    print(updated_event['updated'])
-    print('Event updated: %s' % (updated_event.get('htmlLink')))
+    updated_event: dict = service.events().update(calendarId=google_id,
+                                                  eventId=event['id'],
+                                                  body=event).execute()
+    ic(updated_event)
+    print(f'Événement mis à jour: {updated_event.get("summary")}')
 
 
 def main() -> None:
     credentials = get_credentials()
-    try:
-        service = build("calendar", "v3", credentials=credentials)
-    except HttpError as error:
-        print(f"An error occurred: {error}")
-        sys.exit(1)
-    # http = credentials.authorize(httplib2.Http())
-    # service = build('calendar', 'v3', http=http)
+    service = get_service(credentials)
     # On passe en revue les activités
     for activity, value in activities.items():
         asvette_id: int = value['asvette_id']
         google_id: str = value['google_id']
-        # URL pour Google Calendar
-        calendar_api_url: str = f"https://www.googleapis.com/calendar/v3/calendars/{google_id}/events"
         print(f"---------\n{activity}")
         # 1. Recherche des sorties pour l'activité sur le site ASVETTE
         liste_sorties: pd.DataFrame = get_asvette_events(asvette_id)
