@@ -27,17 +27,11 @@ ic.configureOutput(includeContext=True)
 SCOPES: list[str] = ["https://www.googleapis.com/auth/calendar"]
 TOKEN: str = "token.json"
 
-# TODO: Rétablir la liste des activités aprés les tests
-ACTIVITIES: dict[str, dict] = {
-    'Rando Raquettes': {'asvette_id': 6,
-                        'google_id': 'tot2sof5fb0ddj9uqkve8u8d04@group.calendar.google.com'},
-    'Randonnée': {'asvette_id': 5,
-                  'google_id': 't8bj4vjgn5ls679c9lc96f0auo@group.calendar.google.com'}
-}
+
 ESC: str = 'l5t9lmq3d84uam9rvuvkfum4q4@group.calendar.google.com'
 SDF: str = 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'
 # List des activités et id ASVETTE correspondant. Le Ski Alpin est exclu.
-ACTIVITIES_TODO: dict[str, dict] = {
+ACTIVITIES: dict[str, dict] = {
     'Ski de Rando': {'asvette_id': 1,
                      'google_id': '9676k6ja62o3karrf1qal43vg8@group.calendar.google.com'},
     'Ski de Fond': {'asvette_id': 2, 'google_id': SDF},
@@ -202,8 +196,7 @@ def get_asvette_events(activity_id: int) -> pd.DataFrame:
                             'Lieu': 'Location'})
     df = df[['Id', 'Subject', SD_str, ST_str, ED_str, ET_str, ADE_str,
              'Description', 'Location', 'Private']]
-    df['Id'] = df['Id'].apply(lambda x: 'asvette' + 'test' + 'act' + str(activity_id) + 'id' + str(
-        x))  # TODO: Remove 'test' from string
+    df['Id'] = df['Id'].apply(lambda x: 'asvette' + 'act' + str(activity_id) + 'id' + str(x))
     return df
 
 
@@ -408,7 +401,8 @@ def check_google_events(service, act: str, cal_id: str, liste_asvette: pd.DataFr
     liste_google (pd.DataFrame): The list of events from Google Calendar.
 
     Returns:
-    tuple[int, int, int]: A tuple containing the number of identical events, the number of different events and the number of absent events.
+    tuple[int, int, int]: A tuple containing the number of identical events, the number of
+    different events and the number of absent events.
     """
     nb_identical: int = 0
     nb_different: int = 0
