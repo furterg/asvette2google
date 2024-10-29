@@ -20,8 +20,8 @@ from icecream import ic
 ic.configureOutput(includeContext=True)
 
 # If modifying these scopes, delete the file token.json.
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
-TOKEN = "token.json"
+SCOPES: list[str] = ["https://www.googleapis.com/auth/calendar"]
+TOKEN: str = "token.json"
 
 # TODO: Rétablir la liste des activités aprés les tests
 activities: dict[str, dict] = {
@@ -41,27 +41,16 @@ activities: dict[str, dict] = {
 #     'Ski de randonnée nordique': {'asvette_id': 10, 'google_id': 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'},
 # }
 
-API_KEY = os.environ.get('GOOGLE_CALENDAR_API_KEY')
 
-# Replace with your API key
-if API_KEY is None:
-    print("API_KEY not found")
-    sys.exit(1)
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        ic(f"Execution time: {end - start:.2f} seconds")
+        return result
 
-# Definir les dates de collecte des événements Google (aujourd'hui + 1 an)
-today: datetime = datetime.date.today()
-tomorrow: datetime = today + datetime.timedelta(days=365)
-time_min = f'{today}T00:00:00Z'
-time_max: datetime = f'{tomorrow}T23:59:59Z'
-
-# Parameters for the Google API request
-params = {
-    'key': API_KEY,
-    'timeMin': time_min,
-    'timeMax': time_max,
-    'singleEvents': True,
-    'orderBy': 'startTime'
-}
+    return wrapper
 
 
 def get_credentials():
@@ -91,17 +80,6 @@ def get_credentials():
         with open(TOKEN, "w") as token:
             token.write(creds.to_json())
     return creds
-
-
-def timer(func):
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        result = func(*args, **kwargs)
-        end = time.time()
-        ic(f"Execution time: {end - start:.2f} seconds")
-        return result
-
-    return wrapper
 
 
 def get_asvette_events(activity_id: int) -> pd.DataFrame:
@@ -231,18 +209,17 @@ def get_google_event_row(event):
     return row
 
 
-def get_google_events(service, google_id: str) -> pd.DataFrame:
+def get_google_events(service, google_id: str) -> pd.DataFrame | None:
     """
-    Cette fonction va chercher les sorties de l'utilisateur sur Google Calendar
+    Cette fonction va chercher les sorties de l'activité sur Google Calendar
     et les mettre en forme dans un DataFrame.
-    :param google_id: Id de l'utilisateur sur Google Calendar
+    :param google_id: Id du calendrier sur Google Calendar
     :type google_id: string
     :return: dataframe des sorties
     :rtype: pandas dataframe
     """
     # Call the Calendar API
     now = datetime.datetime.now().isoformat() + "Z"  # 'Z' indicates UTC time
-    ic(now)
     events_result = (
         service.events()
         .list(
@@ -263,15 +240,9 @@ def get_google_events(service, google_id: str) -> pd.DataFrame:
                                     'All Day Event', 'Description', 'Location', 'Private']]
     # Prints the start and name of the next 10 events
     for event in events:
-        # start = event["start"].get("dateTime", event["start"].get("date"))
-        ic(event)
         row = get_google_event_row(event)
-        ic(event)
-        ic(row)
         event_list.append(row)
-    ic(event_list)
     df: pd.DataFrame = pd.DataFrame(event_list[1:], columns=event_list[0])
-    ic(df.head(5))
     return df
 
 
