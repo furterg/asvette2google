@@ -222,17 +222,21 @@ def get_google_events(service, google_id: str) -> pd.DataFrame | None:
     """
     # Call the Calendar API
     now = datetime.datetime.now().isoformat() + "Z"  # 'Z' indicates UTC time
-    events_result = (
-        service.events()
-        .list(
-            calendarId=google_id,
-            timeMin=now,
-            singleEvents=True,
-            orderBy="startTime",
+    try:
+        events_result = (
+            service.events()
+            .list(
+                calendarId=google_id,
+                timeMin=now,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+            .execute()
         )
-        .execute()
-    )
-    events = events_result.get("items", [])
+        events = events_result.get("items", [])
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        sys.exit(1)
 
     if not events:
         print("No upcoming events found.")
