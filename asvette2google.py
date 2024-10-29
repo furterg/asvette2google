@@ -1,16 +1,18 @@
 """
-Ce script va rechercher la liste des sorties pour chaque activité sur ASVETTE et créé un fichier csv
-à importer dans les calendriers Google correspondant.
-Le fichier CSV est créé uniquement si un ou plusieurs sorties sont prévues pour l'activité en question.
+Ce script va rechercher la liste des sorties pour chaque activité sur ASVETTE.
+I lva ensuite récupérer la liste des sorties présentes dans le calendrier Google correspondant.
+En fonction des résultats:
+- On ajoute les sorties de l'activité ASVETTE qui n'existent pas sur Google Calendar.
+- On met à jour les sorties de l'activité ASVETTE qui ont changé.
 """
 import os
 import sys
 import time
-from idlelib.debugger_r import start_debugger
 
 import requests
 import pandas as pd
 import datetime
+import httplib2
 from bs4 import BeautifulSoup
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -26,22 +28,34 @@ SCOPES: list[str] = ["https://www.googleapis.com/auth/calendar"]
 TOKEN: str = "token.json"
 
 # TODO: Rétablir la liste des activités aprés les tests
-activities: dict[str, dict] = {
-    'Rando Raquettes': {'asvette_id': 6, 'google_id': 'tot2sof5fb0ddj9uqkve8u8d04@group.calendar.google.com'}
+ACTIVITIES: dict[str, dict] = {
+    'Rando Raquettes': {'asvette_id': 6,
+                        'google_id': 'tot2sof5fb0ddj9uqkve8u8d04@group.calendar.google.com'},
+    'Randonnée': {'asvette_id': 5,
+                  'google_id': 't8bj4vjgn5ls679c9lc96f0auo@group.calendar.google.com'}
 }
-
+ESC: str = 'l5t9lmq3d84uam9rvuvkfum4q4@group.calendar.google.com'
+SDF: str = 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'
 # List des activités et id ASVETTE correspondant. Le Ski Alpin est exclu.
-# activities: dict[str, dict] = {
-#     'Ski de Rando': {'asvette_id': 1, 'google_id': '9676k6ja62o3karrf1qal43vg8@group.calendar.google.com'},
-#     'Ski de Fond': {'asvette_id': 2, 'google_id': 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'},
-#     'Alpinisme': {'asvette_id': 4, 'google_id': 'd1q94ivu5pm8mmui4pn9mjcbmc@group.calendar.google.com'},
-#     'Randonnée': {'asvette_id': 5, 'google_id': 'lk29f8nbu3i0hhn70i7b8oetho@group.calendar.google.com'},
-#     'Rando Raquettes': {'asvette_id': 6, 'google_id': 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'},
-#     'Via Ferrata': {'asvette_id': 7, 'google_id': 'l5t9lmq3d84uam9rvuvkfum4q4@group.calendar.google.com'},
-#     'Canyoning': {'asvette_id': 8, 'google_id': 'l5t9lmq3d84uam9rvuvkfum4q4@group.calendar.google.com'},
-#     'Escalade': {'asvette_id': 9, 'google_id': 'l5t9lmq3d84uam9rvuvkfum4q4@group.calendar.google.com'},
-#     'Ski de randonnée nordique': {'asvette_id': 10, 'google_id': 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'},
-# }
+ACTIVITIES_TODO: dict[str, dict] = {
+    'Ski de Rando': {'asvette_id': 1,
+                     'google_id': '9676k6ja62o3karrf1qal43vg8@group.calendar.google.com'},
+    'Ski de Fond': {'asvette_id': 2, 'google_id': SDF},
+    'Alpinisme': {'asvette_id': 4,
+                  'google_id': 'd1q94ivu5pm8mmui4pn9mjcbmc@group.calendar.google.com'},
+    'Randonnée': {'asvette_id': 5,
+                  'google_id': 'lk29f8nbu3i0hhn70i7b8oetho@group.calendar.google.com'},
+    'Rando Raquettes': {'asvette_id': 6, 'google_id': SDF},
+    'Via Ferrata': {'asvette_id': 7, 'google_id': ESC},
+    'Canyoning': {'asvette_id': 8, 'google_id': ESC},
+    'Escalade': {'asvette_id': 9, 'google_id': ESC},
+    'Ski de randonnée nordique': {'asvette_id': 10, 'google_id': SDF},
+}
+ED_str: str = 'End Date'
+SD_str: str = 'Start Date'
+ST_str: str = 'Start Time'
+ET_str: str = 'End Time'
+ADE_str: str = 'All Day Event'
 
 
 def timer(func):
@@ -113,11 +127,10 @@ def get_asvette_events(activity_id: int) -> pd.DataFrame:
     :rtype: pandas dataframe
     """
     # URL pour ASVETTE
-    url: str = f"https://asvel.limoog.net/public/pages/liste-sortie.php?Pass%C3%A9es=F&Activite={activity_id}"
-
+    url: str = (f"https://asvel.limoog.net/public/pages/liste-sortie.php?"
+                f"Pass%C3%A9es=F&Activite={activity_id}")
     # Send a GET request to the webpage
     response: requests.Response = requests.get(url)
-
     # Create a BeautifulSoup object from the response content
     soup: BeautifulSoup = BeautifulSoup(response.content, "html.parser")
 
@@ -132,6 +145,7 @@ def get_asvette_events(activity_id: int) -> pd.DataFrame:
         row_data = [cell.text.strip() for cell in row.find_all("td")]
         if row_data:
             rows.append(row_data)
+            # print(f"ASVETTE: {row_data[1]}, date: {row_data[3]}")
     # On transforme le tableau en DataFrame
     df: pd.DataFrame = pd.DataFrame(rows, columns=headers)
     if df.empty:
@@ -140,49 +154,44 @@ def get_asvette_events(activity_id: int) -> pd.DataFrame:
     # On transforme la colonne 'Date' en datetime
     df['Date'] = pd.to_datetime(df['Date'])
     # On transforme la colonne 'Départ' en datetime
-    df['Heure'] = pd.to_datetime(df['Heure'], format='%H:%M', errors='coerce').dt.time
+    df['Heure'] = pd.to_datetime(df['Heure'], format='%H:%M:%S', errors='coerce').dt.time
 
     first_char: str = 'Durée_first_char'
     # On extrait le nombre de jours de la colonne 'Durée'
     df[first_char] = df['Durée'].apply(lambda x: int(x.split(' ')[0]) - 1)
     # On ajoute le nombre de jours pour créer la colonne 'End Date'
-    df['End Date'] = df.apply(lambda ligne: ligne['Date'] + pd.DateOffset(days=ligne[first_char]),
-                              axis=1)
+    df[ED_str] = df.apply(lambda ligne: ligne['Date'] + pd.DateOffset(days=ligne[first_char]),
+                          axis=1)
     # On supprime la colonne 'Durée_first_char', plus besoin.
     df = df.drop(first_char, axis=1)
     df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
-    df['End Date'] = df['End Date'].dt.strftime('%Y-%m-%d')
+    df[ED_str] = df[ED_str].dt.strftime('%Y-%m-%d')
 
     # On ajoute une colonne 'Description' qui correspond à Difficulté + Encadrant
     df['Description'] = df['Difficulté'] + ' | ' + df['Encadrant']
 
     # On ajoute deux colonnes pour le bon format du CSV
-    df['End Time'] = ''
+    df[ET_str] = ''
     df['Private'] = ''
-    # Ajoute 3 heure à l'heure de début pour déterminer la fin si pas une sortie journée.
-    df['End Time'] = df.apply(lambda x: (datetime.datetime.combine(datetime.date.today(), x['Heure'])
-                                         + datetime.timedelta(hours=3)).time()
-    if not pd.isnull(x['Heure']) else '', axis=1)
+    # Ajoute TROIS heures à l'heure de début pour déterminer la fin si pas une sortie journée.
+    df[ET_str] = df.apply(
+        lambda x: (datetime.datetime.combine(datetime.date.today(), x['Heure'])
+                   + datetime.timedelta(hours=3)).time()
+        if not pd.isnull(x['Heure']) else '', axis=1)
 
     # On considère qu'une sortie dure la journée s'il n'y a pas d'heure de départ ou si le départ
-    # est avant 10h00
-    df['All Day Event'] = df['Heure'].apply(
-        lambda x: 'TRUE' if pd.isnull(x) or x < pd.to_datetime('10:00').time() else 'FALSE')
-    df['Heure'] = df['Heure'].apply(lambda x: x.strftime('%H:%M') if not pd.isnull(x) else '')
-    df['End Time'] = df['End Time'].apply(lambda x: x.strftime('%H:%M') if x else '')
-    # On transforme la colonne 'Date' en datetime
-
-    ic(df.columns)
+    # est avant 10h00.
+    df[ADE_str] = df['Heure'].apply(
+        lambda x: 'TRUE' if pd.isnull(x) or x < pd.to_datetime('10:00:00').time() else 'FALSE')
+    df['Heure'] = df['Heure'].apply(lambda x: x.strftime('%H:%M:%S') if not pd.isnull(x) else '')
+    df[ET_str] = df[ET_str].apply(lambda x: x.strftime('%H:%M:%S') if x else '')
     # On renomme les colonnes pour correspondre au format du fichier csv
-    df = df.rename(columns={'Nom': 'Subject', 'Date': 'Start Date', 'Heure': 'Start Time',
+    df = df.rename(columns={'Nom': 'Subject', 'Date': SD_str, 'Heure': ST_str,
                             'Lieu': 'Location'})
-    df = df[['Id', 'Subject', 'Start Date', 'Start Time', 'End Date', 'End Time', 'All Day Event',
+    df = df[['Id', 'Subject', SD_str, ST_str, ED_str, ET_str, ADE_str,
              'Description', 'Location', 'Private']]
-    df['Id'] = df['Id'].apply(lambda x: 'asvette' + 'test' + 'act' + str(activity_id) + 'id' + str(x))  # TODO: Remove 'test' from string
-    ic(df.columns)
-    ic(df.head(5))
-    df = df.iloc[:3, :]  # TODO: Supprimer cette ligne si on veut afficher toutes les sorties
-    ic(df.iloc[0].to_dict())
+    df['Id'] = df['Id'].apply(lambda x: 'asvette' + 'test' + 'act' + str(activity_id) + 'id' + str(
+        x))  # TODO: Remove 'test' from string
     return df
 
 
@@ -191,7 +200,7 @@ def get_google_event_row(event):
     Cette fonction prend un événement Google Calendar en entrée et renvoie
     la ligne correspondante au format CSV attendu par le fichier de sortie.
 
-    :param event: un événement Google Calendar
+    :param event: Un événement Google Calendar
     :type event: dict
     :return: la ligne correspondante au format CSV
     :rtype: list
@@ -207,7 +216,6 @@ def get_google_event_row(event):
         start_time_str = start.split('T')[1].split('+')[0]
         row.append(start_time_str)
         start_time = datetime.datetime.strptime(start_time_str, '%H:%M:%S')
-        ic(start_time.hour)
         all_day = 'TRUE' if start_time.hour < 10 else 'FALSE'
     else:
         row.append(start)
@@ -221,10 +229,9 @@ def get_google_event_row(event):
         row.append('')
     row.append(all_day)
     row.append(event['description'] if 'description' in event.keys() else '')
-    ic('location' in event.keys())
     row.append(event['location'] if 'location' in event.keys() else '')
     row.append('')
-    print(f"Event: {event['summary']}, Start: {start}")
+    # print(f"GOOGLE: {event['summary']}, début: {start.split('T')[0]}, fin: {end.split('T')[0]}")
     return row
 
 
@@ -232,6 +239,8 @@ def get_google_events(service, google_id: str) -> pd.DataFrame | None:
     """
     Cette fonction va chercher les sorties de l'activité sur Google Calendar
     et les mettre en forme dans un DataFrame.
+    :param service: Service Google Calendar
+    :type service: object
     :param google_id: Id du calendrier sur Google Calendar
     :type google_id: string
     :return: dataframe des sorties
@@ -252,15 +261,18 @@ def get_google_events(service, google_id: str) -> pd.DataFrame | None:
         )
         events = events_result.get("items", [])
     except HttpError as error:
-        print(f"An error occurred: {error}")
+        print(f"Une erreur s'est produite: {error}")
+        sys.exit(1)
+    except httplib2.error.ServerNotFoundError as error:
+        print(f"Une erreur s'est produite: {error}")
         sys.exit(1)
 
     if not events:
-        print("No upcoming events found.")
+        print("Aucune sortie trouvée.")
         return
 
-    event_list: list[list[str]] = [['Id', 'Subject', 'Start Date', 'Start Time',
-                                    'End Date', 'End Time', 'All Day Event',
+    event_list: list[list[str]] = [['Id', 'Subject', SD_str, ST_str,
+                                    ED_str, ET_str, ADE_str,
                                     'Description', 'Location', 'Private']]
     for event in events:
         row = get_google_event_row(event)
@@ -273,16 +285,15 @@ def get_asvette_event_row_dict(asvette: dict) -> dict:
     """
     Cette fonction transforme un dictionnaire représentant une sortie ASVETTE
     en un dictionnaire correspondant à l'API Google Calendar.
-    :param asvette: dictionnaire représentant une sortie ASVETTE
+    :param asvette: Dictionnaire représentant une sortie ASVETTE
     :type asvette: dict
     :return: dictionnaire représentant la sortie ASVETTE en format Google Calendar
     :rtype: dict
     """
-    ic(asvette)
-    s_date: str = asvette['Start Date']
-    e_date: str = asvette['End Date']
-    s_time: str = asvette['Start Time']
-    e_time: str = asvette['End Time']
+    s_date: str = asvette[SD_str]
+    e_date: str = asvette[ED_str]
+    s_time: str = asvette[ST_str]
+    e_time: str = asvette[ET_str]
     if asvette['All Day Event'] == 'TRUE':
         start: str = r"{" + f"'date': '{s_date}', 'timeZone': 'Europe/Paris'" + r"}"
         end: str = r"{" + f"'date': '{e_date}', 'timeZone': 'Europe/Paris'" + r"}"
@@ -299,7 +310,18 @@ def get_asvette_event_row_dict(asvette: dict) -> dict:
     }
 
 
-def add_google_event(service, google_id: str,event: dict) -> None:
+def diff_asvette_google(asv_dict: dict, google_dict: dict) -> bool:
+    nb_diff: int = 0
+    for key, valeur in asv_dict.items():
+        # Si la valeur ASVETTE est différente de la valeur dans le calendrier
+        if valeur != google_dict[key]:
+            print('ASVETTE {key}: {valeur}\n'
+                  'GOOGLE {key}: {google_dict[key]}\n')
+            nb_diff += 1
+    return True if nb_diff > 0 else False
+
+
+def add_google_event(service, google_id: str, event: dict) -> None:
     """
     This function adds a new event to a Google Calendar using the Google Calendar API.
 
@@ -315,15 +337,18 @@ def add_google_event(service, google_id: str,event: dict) -> None:
         event: dict = service.events().insert(calendarId=google_id, body=event).execute()
         print(f'Événement créé: {event.get("summary")}')
     except HttpError as error:
-        print(f"Une erreur s'est produite: {error}")
-        sys.exit(1)
+        # Si l'événement a été supprimé du calendrier. L'id existe et cela génère une erreur.
+        if error.resp.status == 409:
+            update_google_event(service, google_id, event)
+        else:
+            print(f"Une erreur s'est produite: {error}")
+            sys.exit(1)
 
 
 def update_google_event(service, google_id: str, event: dict) -> None:
     updated_event: dict = service.events().update(calendarId=google_id,
                                                   eventId=event['id'],
                                                   body=event).execute()
-    ic(updated_event)
     print(f'Événement mis à jour: {updated_event.get("summary")}')
 
 
@@ -331,61 +356,52 @@ def main() -> None:
     credentials = get_credentials()
     service = get_service(credentials)
     # On passe en revue les activités
-    for activity, value in activities.items():
+    for activity, value in ACTIVITIES.items():
+        nb_identical: int = 0
+        nb_different: int = 0
+        nb_absentes: int = 0
         asvette_id: int = value['asvette_id']
         google_id: str = value['google_id']
-        print(f"---------\n{activity}")
+        print(f"---------\n{activity}\n")
         # 1. Recherche des sorties pour l'activité sur le site ASVETTE
+        print(f"Recherche des sorties {activity} sur le site ASVETTE...")
         liste_sorties: pd.DataFrame = get_asvette_events(asvette_id)
-        if liste_sorties.empty:
-            print(f"Aucune sortie {activity} trouvée")
-            continue
-        print(f"Nombre de sorties pour l'activité {activity} : {liste_sorties.shape[0]}")
-        # 2. Recherche des sorties pour l'activité sur Google Calendar
-        liste_google_events: pd.DataFrame = get_google_events(service, google_id)
-        ic(liste_google_events.iloc[0])
         # Si aucune sortie ASVETTE, Alors on passe à l'activité suivante
         if liste_sorties.shape[0] == 0:
-            print(f"Aucune sortie {activity} de ASVETTE")
+            print(f"Aucune sortie {activity} trouvée")
             continue
-        # Si aucune sortie Google Calendar, Alors on ajoute les sorties de l'activité ASVETTe
-        if liste_google_events is None:
-            print(f"Aucune sortie {activity} sur Google Calendar")
-            for index, row in liste_sorties.iterrows():
-                ic(row)
-                ic(row.to_dict())
-                event = get_asvette_event_row_dict(row.to_dict())
-                ic(event)
-                add_google_event(service, google_id, event)
-            continue
-        else:
-            # TODO : on compare les sorties de l'activité ASVETTE avec celles de Google Calendar
-            # On ajoute les sorties de l'activité ASVETTE qui n'existent pas sur Google Calendar
-            # create the code now
-            for index, row in liste_sorties.iterrows():
-                ic(row)
-                ic(row.to_dict())
-                if row['Id'] not in liste_google_events['Id'].values:
-                    event = get_asvette_event_row_dict(row.to_dict())
-                    ic(event)
-                    add_google_event(service, google_id, event)
-        # On passe en revue les sorties
+        print(f"Nombre de sorties asvette pour l'activité {activity} : {len(liste_sorties)}")
+        # 2. Recherche des sorties pour l'activité sur Google Calendar
+        print(f"\nRecherche des sorties {activity} sur Google Calendar...")
+        liste_google_events: pd.DataFrame | None = get_google_events(service, google_id)
+        nb_google: int = 0 if liste_google_events is None else len(liste_google_events)
+        print(f"Nombre de sorties Google pour l'activité {activity} : {nb_google}")
+        print("")
+        # Si des sorties existent dans le calendrier. On passe en revue la liste:
         for index, row in liste_sorties.iterrows():
-            ic(index)
-            ic(row.to_dict())
-            print(f"Id {row['Id']}")
-            if row['Id'] in liste_google_events['Id'].values:
-                index = liste_google_events[liste_google_events['Id'] == row['Id']].index.item()
-                ic(liste_google_events.iloc[index].to_dict())
-                if row.to_dict() == liste_google_events.iloc[index].to_dict():
-                    print(f"Id {row['Id']} de la sortie {activity} de ASVETTE identique")
-                else:
-                    print(f"Id {row['Id']} de la sortie {activity} de ASVETTE non identique")
-                    event = get_asvette_event_row_dict(row.to_dict())
-                    ic(event)
+            event = get_asvette_event_row_dict(row.to_dict())
+            # Si la sortie (id) n'est pas dans le calendrier, on l'ajoute
+            if liste_google_events is None or row['Id'] not in liste_google_events['Id'].values:
+                print(f"La Sortie {row['Subject']} n'existe pas sur Google Calendar.")
+                nb_absentes += 1
+                add_google_event(service, google_id, event)
+            # Si la sortie (id) est dans le calendrier, on compare les champs
+            else:
+                # On stocke l'index de la sortie dans le dataframe Google
+                google_index = (liste_google_events[liste_google_events['Id'] == row['Id']]
+                                .index.item())
+                if diff_asvette_google(row.to_dict(),
+                                       liste_google_events.iloc[google_index].to_dict()):
+                    print(
+                        f"La sortie {row['Subject']} de l'activité {activity} "
+                        f"n'est pas la même que sur Google Calendar")
+                    nb_different += 1
                     update_google_event(service, google_id, event)
-
-            print(f"Id {row['Id']} de la sortie {activity} de ASVETTE trouvé")
+                else:
+                    nb_identical += 1
+        print(f"\nsorties {activity} identiques: {nb_identical}\n"
+              f"sorties {activity} différentes: {nb_different}\n"
+              f"sorties {activity} absentes: {nb_absentes}́")
 
 
 if __name__ == '__main__':
