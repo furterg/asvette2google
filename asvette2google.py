@@ -352,14 +352,40 @@ def update_google_event(service, google_id: str, event: dict) -> None:
     print(f'Événement mis à jour: {updated_event.get("summary")}')
 
 
+def check_google_events(service, act: str, cal_id: str, liste_asvette: pd.DataFrame,
+                        liste_google: pd.DataFrame) -> tuple[int, int, int]:
+    nb_identical: int = 0
+    nb_different: int = 0
+    nb_absentes: int = 0
+    for index, row in liste_asvette.iterrows():
+        event = get_asvette_event_row_dict(row.to_dict())
+        # Si la sortie (id) n'est pas dans le calendrier, on l'ajoute
+        if liste_google is None or row['Id'] not in liste_google['Id'].values:
+            print(f"La Sortie {row['Subject']} n'existe pas sur Google Calendar.")
+            nb_absentes += 1
+            add_google_event(service, cal_id, event)
+        # Si la sortie (id) est dans le calendrier, on compare les champs
+        else:
+            # On stocke l'index de la sortie dans le dataframe Google
+            google_index = (liste_google[liste_google['Id'] == row['Id']]
+                            .index.item())
+            if diff_asvette_google(row.to_dict(),
+                                   liste_google.iloc[google_index].to_dict()):
+                print(
+                    f"La sortie {row['Subject']} de l'activité {act} "
+                    f"n'est pas la même que sur Google Calendar")
+                nb_different += 1
+                update_google_event(service, cal_id, event)
+            else:
+                nb_identical += 1
+    return nb_identical, nb_different, nb_absentes
+
+
 def main() -> None:
     credentials = get_credentials()
     service = get_service(credentials)
     # On passe en revue les activités
     for activity, value in ACTIVITIES.items():
-        nb_identical: int = 0
-        nb_different: int = 0
-        nb_absentes: int = 0
         asvette_id: int = value['asvette_id']
         google_id: str = value['google_id']
         print(f"---------\n{activity}\n")
@@ -377,31 +403,12 @@ def main() -> None:
         nb_google: int = 0 if liste_google_events is None else len(liste_google_events)
         print(f"Nombre de sorties Google pour l'activité {activity} : {nb_google}")
         print("")
-        # Si des sorties existent dans le calendrier. On passe en revue la liste:
-        for index, row in liste_sorties.iterrows():
-            event = get_asvette_event_row_dict(row.to_dict())
-            # Si la sortie (id) n'est pas dans le calendrier, on l'ajoute
-            if liste_google_events is None or row['Id'] not in liste_google_events['Id'].values:
-                print(f"La Sortie {row['Subject']} n'existe pas sur Google Calendar.")
-                nb_absentes += 1
-                add_google_event(service, google_id, event)
-            # Si la sortie (id) est dans le calendrier, on compare les champs
-            else:
-                # On stocke l'index de la sortie dans le dataframe Google
-                google_index = (liste_google_events[liste_google_events['Id'] == row['Id']]
-                                .index.item())
-                if diff_asvette_google(row.to_dict(),
-                                       liste_google_events.iloc[google_index].to_dict()):
-                    print(
-                        f"La sortie {row['Subject']} de l'activité {activity} "
-                        f"n'est pas la même que sur Google Calendar")
-                    nb_different += 1
-                    update_google_event(service, google_id, event)
-                else:
-                    nb_identical += 1
-        print(f"\nsorties {activity} identiques: {nb_identical}\n"
-              f"sorties {activity} différentes: {nb_different}\n"
-              f"sorties {activity} absentes: {nb_absentes}́")
+        # Si des sorties existent dans le calendrier. On passe en revue la liste :
+        ident, diff, absent = check_google_events(service, activity, google_id, liste_sorties,
+                                                  liste_google_events)
+        print(f"\nsorties {activity} identiques: {ident}\n"
+              f"sorties {activity} différentes: {diff}\n"
+              f"sorties {activity} absentes: {absent}́")
 
 
 if __name__ == '__main__':
