@@ -60,6 +60,18 @@ ADE_str: str = 'All Day Event'
 
 def timer(func):
     def wrapper(*args, **kwargs):
+        """
+        Decorator to measure the execution time of a function.
+
+        Prints the execution time of the wrapped function using icecream.
+
+        Example:
+            @timer
+            def my_function():
+                ...
+
+            my_function()  # prints "Execution time: 0.00 seconds"
+        """
         start = time.time()
         result = func(*args, **kwargs)
         end = time.time()
@@ -311,6 +323,16 @@ def get_asvette_event_row_dict(asvette: dict) -> dict:
 
 
 def diff_asvette_google(asv_dict: dict, google_dict: dict) -> bool:
+    """
+    Check if an ASVETTE event is different from a Google Calendar event.
+
+    Parameters:
+    asv_dict (dict): The dictionary representing the ASVETTE event
+    google_dict (dict): The dictionary representing the Google Calendar event
+
+    Returns:
+    bool: True if there is a difference between the two events, False otherwise
+    """
     nb_diff: int = 0
     for key, valeur in asv_dict.items():
         # Si la valeur ASVETTE est différente de la valeur dans le calendrier
@@ -346,6 +368,21 @@ def add_google_event(service, google_id: str, event: dict) -> None:
 
 
 def update_google_event(service, google_id: str, event: dict) -> None:
+    """
+    This function updates an event in a Google Calendar using the Google Calendar API.
+
+    Parameters:
+    service (googleapiclient.discovery.Resource): The Google Calendar API service.
+    google_id (str): The ID of the Google Calendar.
+    event (dict): The event to be updated in the Google Calendar.
+
+    Returns:
+    None
+    """
+    updated_event: dict = service.events().update(calendarId=google_id,
+                                                  eventId=event['id'],
+                                                  body=event).execute()
+    print(f'Événement mis à jour: {updated_event.get("summary")}')
     updated_event: dict = service.events().update(calendarId=google_id,
                                                   eventId=event['id'],
                                                   body=event).execute()
@@ -354,6 +391,25 @@ def update_google_event(service, google_id: str, event: dict) -> None:
 
 def check_google_events(service, act: str, cal_id: str, liste_asvette: pd.DataFrame,
                         liste_google: pd.DataFrame) -> tuple[int, int, int]:
+    """
+    Vérifie si les événements d'une activité ASVETTE sont présents sur un calendrier Google.
+    Si un événement n'est pas présent, il est ajouté.
+    Si un événement est présent mais différent, il est mis à jour.
+    Retourne un tuple contenant:
+    - Le nombre d'événements identiques.
+    - Le nombre d'événements différents.
+    - Le nombre d'événements absents du calendrier Google.
+
+    Parameters:
+    service (googleapiclient.discovery.Resource): The Google Calendar API service.
+    act (str): The name of the activity.
+    cal_id (str): The ID of the Google Calendar.
+    liste_asvette (pd.DataFrame): The list of events from ASVETTE.
+    liste_google (pd.DataFrame): The list of events from Google Calendar.
+
+    Returns:
+    tuple[int, int, int]: A tuple containing the number of identical events, the number of different events and the number of absent events.
+    """
     nb_identical: int = 0
     nb_different: int = 0
     nb_absentes: int = 0
