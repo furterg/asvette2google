@@ -376,10 +376,6 @@ def update_google_event(service, google_id: str, event: dict) -> None:
                                                   eventId=event['id'],
                                                   body=event).execute()
     print(f'Événement mis à jour: {updated_event.get("summary")}')
-    updated_event: dict = service.events().update(calendarId=google_id,
-                                                  eventId=event['id'],
-                                                  body=event).execute()
-    print(f'Événement mis à jour: {updated_event.get("summary")}')
 
 
 def check_google_events(service, act: str, cal_id: str, liste_asvette: pd.DataFrame,
@@ -453,7 +449,7 @@ def main() -> None:
         nb_google: int = 0 if liste_google_events is None else len(liste_google_events)
         print(f"Nombre de sorties Google pour l'activité {activity} : {nb_google}")
         print("")
-        # Si des sorties existent dans le calendrier. On passe en revue la liste :
+        # Si des sorties existent dans le calendrier. On passe en revue la liste :
         ident, diff, absent = check_google_events(service, activity, google_id, liste_sorties,
                                                   liste_google_events)
         print(f"\nsorties {activity} identiques: {ident}\n"
