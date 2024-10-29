@@ -6,6 +6,8 @@ Le fichier CSV est créé uniquement si un ou plusieurs sorties sont prévues po
 import os
 import sys
 import time
+from idlelib.debugger_r import start_debugger
+
 import requests
 import pandas as pd
 import datetime
@@ -236,9 +238,9 @@ def get_google_events(service, google_id: str) -> pd.DataFrame | None:
         print("No upcoming events found.")
         return
 
-    event_list: list[list[str]] = [['Id', 'Subject', 'Start Date', 'Start Time', 'End Date', 'End Time',
-                                    'All Day Event', 'Description', 'Location', 'Private']]
-    # Prints the start and name of the next 10 events
+    event_list: list[list[str]] = [['Id', 'Subject', 'Start Date', 'Start Time',
+                                    'End Date', 'End Time', 'All Day Event',
+                                    'Description', 'Location', 'Private']]
     for event in events:
         row = get_google_event_row(event)
         event_list.append(row)
@@ -247,16 +249,25 @@ def get_google_events(service, google_id: str) -> pd.DataFrame | None:
 
 
 def get_asvette_event_row_dict(asvette: dict) -> dict:
+    """
+    Cette fonction transforme un dictionnaire représentant une sortie ASVETTE
+    en un dictionnaire correspondant à l'API Google Calendar.
+    :param asvette: dictionnaire représentant une sortie ASVETTE
+    :type asvette: dict
+    :return: dictionnaire représentant la sortie ASVETTE en format Google Calendar
+    :rtype: dict
+    """
     ic(asvette)
+    s_date: str = asvette['Start Date']
+    e_date: str = asvette['End Date']
+    s_time: str = asvette['Start Time']
+    e_time: str = asvette['End Time']
     if asvette['All Day Event'] == 'TRUE':
-        start: str = r"{" + f"'date': '{asvette['Start Date']}', 'timeZone': 'Europe/Paris'" + r"}"
-        end: str = r"{" + f"'date': '{asvette['End Date']}', 'timeZone': 'Europe/Paris'" + r"}"
+        start: str = r"{" + f"'date': '{s_date}', 'timeZone': 'Europe/Paris'" + r"}"
+        end: str = r"{" + f"'date': '{e_date}', 'timeZone': 'Europe/Paris'" + r"}"
     else:
-        start = r"{" + f"'dateTime': '{asvette['Start Date']}T{asvette['Start Time']}:00', 'timeZone': 'Europe/Paris'" + r"}"
-        end = r"{" + f"'dateTime': '{asvette['End Date']}T{asvette['End Time']}:00', 'timeZone': 'Europe/Paris'" + r"}"
-
-    ic(start)
-    ic(end)
+        start = r"{" + f"'dateTime': '{s_date}T{s_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
+        end = r"{" + f"'dateTime': '{e_date}T{e_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
     return {
         'id': asvette['Id'],
         'summary': asvette['Subject'],
