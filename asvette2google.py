@@ -28,8 +28,8 @@ SCOPES: list[str] = ["https://www.googleapis.com/auth/calendar"]
 TOKEN: str = "token.json"
 
 
-ESC: str = 'l5t9lmq3d84uam9rvuvkfum4q4@group.calendar.google.com'
-SDF: str = 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'
+ESC: str = 'l5t9lmq3d84uam9rvuvkfum4q4@group.calendar.google.com'  # Escalade
+SDF: str = 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'  # Ski de fond
 # List des activités et id ASVETTE correspondant. Le Ski Alpin est exclu.
 ACTIVITIES: dict[str, dict] = {
     'Ski de Rando': {'asvette_id': 1,
@@ -148,7 +148,7 @@ def get_asvette_events(activity_id: int) -> pd.DataFrame:
     # On récupère les données du tableau
     rows: list = []
     for row in table.find_all("tr"):
-        row_data = [cell.text.strip() for cell in row.find_all("td")]
+        row_data: list = [cell.text.strip() for cell in row.find_all("td")]
         if row_data:
             rows.append(row_data)
             # print(f"ASVETTE: {row_data[1]}, date: {row_data[3]}")
@@ -216,12 +216,12 @@ def get_google_event_row(event):
     row.append(event['summary'])
     # get the start date in format 'YYY-MM-DD'
     if 'T' in start:
-        start_date_str = start.split('T')[0]
+        start_date_str: str = start.split('T')[0]
         row.append(start_date_str)
-        start_time_str = start.split('T')[1].split('+')[0]
+        start_time_str: str = start.split('T')[1].split('+')[0]
         row.append(start_time_str)
         start_time = datetime.datetime.strptime(start_time_str, '%H:%M:%S')
-        all_day = 'TRUE' if start_time.hour < 10 else 'FALSE'
+        all_day: str = 'TRUE' if start_time.hour < 10 else 'FALSE'
     else:
         row.append(start)
         row.append('')
@@ -235,8 +235,7 @@ def get_google_event_row(event):
     row.append(all_day)
     row.append(event['description'] if 'description' in event.keys() else '')
     row.append(event['location'] if 'location' in event.keys() else '')
-    row.append('')
-    # print(f"GOOGLE: {event['summary']}, début: {start.split('T')[0]}, fin: {end.split('T')[0]}")
+    row.append('')  # Private
     return row
 
 
@@ -252,7 +251,7 @@ def get_google_events(service, google_id: str) -> pd.DataFrame | None:
     :rtype: pandas dataframe
     """
     # Call the Calendar API
-    now = datetime.datetime.now().isoformat() + "Z"  # 'Z' indicates UTC time
+    now: str = datetime.datetime.now().isoformat() + "Z"  # 'Z' indicates UTC time
     try:
         events_result = (
             service.events()
@@ -404,7 +403,7 @@ def check_google_events(service, act: str, cal_id: str, liste_asvette: pd.DataFr
     nb_different: int = 0
     nb_absentes: int = 0
     for index, row in liste_asvette.iterrows():
-        event = get_asvette_event_row_dict(row.to_dict())
+        event: dict = get_asvette_event_row_dict(row.to_dict())
         # Si la sortie (id) n'est pas dans le calendrier, on l'ajoute
         if liste_google is None or row['Id'] not in liste_google['Id'].values:
             print(f"La Sortie {row['Subject']} n'existe pas sur Google Calendar.")
@@ -413,8 +412,8 @@ def check_google_events(service, act: str, cal_id: str, liste_asvette: pd.DataFr
         # Si la sortie (id) est dans le calendrier, on compare les champs
         else:
             # On stocke l'index de la sortie dans le dataframe Google
-            google_index = (liste_google[liste_google['Id'] == row['Id']]
-                            .index.item())
+            google_index: int = (liste_google[liste_google['Id'] == row['Id']]
+                                 .index.item())
             if diff_asvette_google(row.to_dict(),
                                    liste_google.iloc[google_index].to_dict()):
                 print(
@@ -458,4 +457,5 @@ def main() -> None:
 
 
 if __name__ == '__main__':
+    ic.disable()
     main()
