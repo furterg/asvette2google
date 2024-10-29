@@ -6,6 +6,8 @@ Ce script va rechercher la liste des sorties pour chaque activité sur ASVETTE e
 
 - Python 3.x
 - Les packages requis sont répertoriés dans le fichier `requirements.txt`.
+- être dans la liste des utilisateurs approuvés sur Google API.
+- Avoir le fichier 'credentials.json' qui permet de générer le token.
 
 ## Installation
 
@@ -35,12 +37,20 @@ Exécutez le script en exécutant la commande suivante :
 python3 asvette2google.py
 ```
 
-Le script passera en revue les différentes activités et recherchera les sorties correspondantes sur ASVETTE. Si des sorties sont trouvées, un fichier CSV sera créé pour chaque activité, prêt à être importé dans le calendrier Google.
+Le nouveau programme fait les choses suivantes pour chaque activité :
+
+1. Récupère la liste de sorties sur ASVETTE.
+2. Récupère la liste des sorties sur le calendrier Google correspondant.
+3. Si une sortie existe dans ASVETTE mais pas dans Google, elle est ajoutée au calendrier
+avec un ID qui est basé sur l'ID ASVETTE.
+   * S'il n'y a pas d'heure de début ou si elle débute avant 10h00 → Sortie journée entière
+   * Si l'heure de début est après 10h00 → j'attribue arbitrairement une heure de fin 3h après.
+4. Si une sortie existe aux deux endroits (même ID) mais avec des informations différentes, elle est mise à jour sur le calendrier à partir des infos ASVETTE.
+5Les sorties identiques des deux cotés ne sont pas modifiées.
 
 ## Remarques
 
 * Le Ski Alpin est exclu de la recherche.
-* Les sorties sont filtrées uniquement pour les activités répertoriées dans le dictionnaire activites.
-* Les fichiers CSV seront créés avec le nom de chaque activité.
+* Les sorties sont filtrées uniquement pour les activités répertoriées dans le dictionnaire ACTIVITIES.
 
 Ce projet a été développé par Gregory Furter pour l'[ASVEL Ski Montagne](https://www.asvelskimontagne.fr/).
