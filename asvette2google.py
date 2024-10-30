@@ -445,5 +445,5 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    ic.enable()
+    ic.disable()
     main()
