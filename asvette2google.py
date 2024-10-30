@@ -27,6 +27,7 @@ ic.configureOutput(includeContext=True)
 SCOPES: list[str] = ["https://www.googleapis.com/auth/calendar"]
 TOKEN: str = "token.json"
 
+URL: str = "https://asvel.limoog.net/public/pages/liste-sortie.php?Pass%C3%A9es=F&Activite="
 
 ESC: str = 'l5t9lmq3d84uam9rvuvkfum4q4@group.calendar.google.com'  # Escalade
 SDF: str = 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'  # Ski de fond
@@ -50,6 +51,128 @@ SD_str: str = 'Start Date'
 ST_str: str = 'Start Time'
 ET_str: str = 'End Time'
 ADE_str: str = 'All Day Event'
+
+
+class Activity:
+    def __init__(self, service, name: str, asvette_id: int, calendar_id: str):
+        self.service = service
+        self.name: str = name
+        self.id: int = asvette_id
+        self.cal_id: str = calendar_id
+        self.events: pd.DataFrame = self._get_events()
+        self.nb_events: int = self.events.shape[0]
+        self.is_events_empty: bool = self.events.empty
+        self.cal_events: pd.DataFrame = self._get_cal_events()
+        self.is_cal_events_empty: bool = self.cal_events.empty
+        self.nb_cal_events: int = self.cal_events.shape[0]
+
+    def _get_events(self) -> pd.DataFrame:
+        """
+        Cette fonction va rechercher la liste des sorties pour chaque activité sur ASVETTE et mettre
+        les informations dans un DataFrame.
+        Si le dataframe est vide, on le retourne directement.
+        S'il y a des sorties, on met en forme le Dataframe et on le retourne.
+        """
+        # URL pour ASVETTE
+        url: str = URL + str(self.id)
+        # Send a GET request to the webpage
+        response: requests.Response = requests.get(url)
+        # Create a BeautifulSoup object from the response content
+        soup: BeautifulSoup = BeautifulSoup(response.content, "html.parser")
+
+        # On récupère le tableau des sorties
+        table = soup.find("table", {"id": "table_sortie"})
+        # On récupère les en-têtes du tableau
+        headers: list = [header.text.strip() for header in table.find_all("th")]
+
+        # On récupère les données du tableau
+        rows: list = []
+        for row in table.find_all("tr"):
+            row_data: list = [cell.text.strip() for cell in row.find_all("td")]
+            if row_data:
+                rows.append(row_data)
+                # print(f"ASVETTE: {row_data[1]}, date: {row_data[3]}")
+        # On transforme le tableau en DataFrame
+        df: pd.DataFrame = pd.DataFrame(rows, columns=headers)
+        if df.empty:
+            return df
+
+        # On transforme la colonne 'Date' en datetime
+        df['Date'] = pd.to_datetime(df['Date'])
+        # On transforme la colonne 'Départ' en datetime
+        df['Heure'] = pd.to_datetime(df['Heure'], format='%H:%M:%S', errors='coerce').dt.time
+
+        first_char: str = 'Durée_first_char'
+        # On extrait le nombre de jours de la colonne 'Durée'
+        df[first_char] = df['Durée'].apply(lambda x: int(x.split(' ')[0]) - 1)
+        # On ajoute le nombre de jours pour créer la colonne 'End Date'
+        df[ED_str] = df.apply(lambda ligne: ligne['Date'] + pd.DateOffset(days=ligne[first_char]),
+                              axis=1)
+        # On supprime la colonne 'Durée_first_char', plus besoin.
+        df = df.drop(first_char, axis=1)
+        df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
+        df[ED_str] = df[ED_str].dt.strftime('%Y-%m-%d')
+
+        # On ajoute une colonne 'Description' qui correspond à Difficulté + Encadrant
+        df['Description'] = df['Difficulté'] + ' | ' + df['Encadrant']
+
+        # On ajoute deux colonnes pour le bon format du CSV
+        df[ET_str] = ''
+        df['Private'] = ''
+        # Ajoute TROIS heures à l'heure de début pour déterminer la fin si pas une sortie journée.
+        df[ET_str] = df.apply(
+            lambda x: (datetime.datetime.combine(datetime.date.today(), x['Heure'])
+                       + datetime.timedelta(hours=3)).time()
+            if not pd.isnull(x['Heure']) else '', axis=1)
+
+        # On considère qu'une sortie dure la journée si pas d'heure de départ ou si le départ
+        # est avant 10h00.
+        df[ADE_str] = df['Heure'].apply(
+            lambda x: 'TRUE' if pd.isnull(x) or x < pd.to_datetime('10:00:00').time() else 'FALSE')
+        df['Heure'] = df['Heure'].apply(
+            lambda x: x.strftime('%H:%M:%S') if not pd.isnull(x) else '')
+        df[ET_str] = df[ET_str].apply(lambda x: x.strftime('%H:%M:%S') if x else '')
+        # On renomme les colonnes pour correspondre au format du fichier csv
+        df = df.rename(columns={'Nom': 'Subject', 'Date': SD_str, 'Heure': ST_str,
+                                'Lieu': 'Location'})
+        df = df[['Id', 'Subject', SD_str, ST_str, ED_str, ET_str, ADE_str,
+                 'Description', 'Location', 'Private']]
+        df['Id'] = df['Id'].apply(lambda x: 'asvette' + 'act' + str(self.id) + 'id' + str(x))
+        return df
+
+    def _get_cal_events(self):
+        """
+            Cette fonction va chercher les sorties de l'activité sur Google Calendar
+            et les mettre en forme dans un DataFrame.
+            """
+        # Call the Calendar API
+        now: str = datetime.datetime.now().isoformat() + "Z"  # 'Z' indicates UTC time
+        try:
+            events_result = (
+                self.service.events()
+                .list(
+                    calendarId=self.cal_id,
+                    timeMin=now,
+                    singleEvents=True,
+                    orderBy="startTime",
+                )
+                .execute()
+            )
+            events = events_result.get("items", [])
+        except HttpError as error:
+            print(f"Une erreur s'est produite: {error}")
+            sys.exit(1)
+        except httplib2.error.ServerNotFoundError as error:
+            print(f"Une erreur s'est produite: {error}")
+            sys.exit(1)
+        event_list: list[list[str]] = [['Id', 'Subject', SD_str, ST_str,
+                                        ED_str, ET_str, ADE_str,
+                                        'Description', 'Location', 'Private']]
+        for event in events:
+            row = get_google_event_row(event)
+            event_list.append(row)
+        df: pd.DataFrame = pd.DataFrame(event_list[1:], columns=event_list[0])
+        return df
 
 
 def timer(func):
@@ -456,6 +579,21 @@ def main() -> None:
               f"sorties {activity} absentes: {absent}́")
 
 
+def tests() -> None:
+    credentials = get_credentials()
+    service = get_service(credentials)
+    # On passe en revue les activités
+    for activity, value in ACTIVITIES.items():
+        act = Activity(service, activity, value['asvette_id'], value['google_id'])
+        print(f"---------\n{act.name}\n")
+        if act.is_events_empty:
+            print(f"Aucune sortie {act.name} trouvée")
+            continue
+        print(f"Nombre de sorties asvette pour l'activité {act.name} : {act.nb_events}")
+        print("")
+
+
 if __name__ == '__main__':
-    ic.disable()
-    main()
+    ic.enable()
+    # main()
+    tests()
