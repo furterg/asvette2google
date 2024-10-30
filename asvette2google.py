@@ -53,18 +53,87 @@ ET_str: str = 'End Time'
 ADE_str: str = 'All Day Event'
 
 
-class Activity:
-    def __init__(self, service, name: str, asvette_id: int, calendar_id: str):
+class GoogleCalendar:
+
+    def __init__(self, service, name: str, calendar_id: str):
         self.service = service
+        self.name: str = name
+        self.id: str = calendar_id
+        self.events: pd.DataFrame = self._get_events()
+        self.is_events_empty: bool = self.events.empty
+        self.nb_events: int = self.events.shape[0]
+
+    def _get_events(self):
+        """
+            Cette fonction va chercher les sorties de l'activité sur Google Calendar
+            et les mettre en forme dans un DataFrame.
+            """
+        # Call the Calendar API
+        now: str = datetime.datetime.now().isoformat() + "Z"  # 'Z' indicates UTC time
+        try:
+            events_result = (
+                self.service.events()
+                .list(
+                    calendarId=self.id,
+                    timeMin=now,
+                    singleEvents=True,
+                    orderBy="startTime",
+                )
+                .execute()
+            )
+            events = events_result.get("items", [])
+        except HttpError as error:
+            print(f"Une erreur s'est produite: {error}")
+            sys.exit(1)
+        except httplib2.error.ServerNotFoundError as error:
+            print(f"Une erreur s'est produite: {error}")
+            sys.exit(1)
+        event_list: list[list[str]] = [['Id', 'Subject', SD_str, ST_str,
+                                        ED_str, ET_str, ADE_str,
+                                        'Description', 'Location', 'Private']]
+        for event in events:
+            row = get_google_event_row(event)
+            event_list.append(row)
+        df: pd.DataFrame = pd.DataFrame(event_list[1:], columns=event_list[0])
+        return df
+
+
+class Activity:
+    def __init__(self, name: str, asvette_id: int, calendar_id: str):
         self.name: str = name
         self.id: int = asvette_id
         self.cal_id: str = calendar_id
         self.events: pd.DataFrame = self._get_events()
         self.nb_events: int = self.events.shape[0]
         self.is_events_empty: bool = self.events.empty
-        self.cal_events: pd.DataFrame = self._get_cal_events()
-        self.is_cal_events_empty: bool = self.cal_events.empty
-        self.nb_cal_events: int = self.cal_events.shape[0]
+
+    def get_row_dict(self, row_id: int) -> dict:
+        """
+        Cette fonction transforme un dictionnaire représentant une sortie ASVETTE
+        en un dictionnaire correspondant à l'API Google Calendar.
+        :param asvette: Dictionnaire représentant une sortie ASVETTE
+        :type asvette: dict
+        :return: dictionnaire représentant la sortie ASVETTE en format Google Calendar
+        :rtype: dict
+        """
+        s_date: str = asvette[SD_str]
+        e_date: str = asvette[ED_str]
+        s_time: str = asvette[ST_str]
+        e_time: str = asvette[ET_str]
+        if asvette['All Day Event'] == 'TRUE':
+            start: str = r"{" + f"'date': '{s_date}', 'timeZone': 'Europe/Paris'" + r"}"
+            end: str = r"{" + f"'date': '{e_date}', 'timeZone': 'Europe/Paris'" + r"}"
+        else:
+            start = r"{" + f"'dateTime': '{s_date}T{s_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
+            end = r"{" + f"'dateTime': '{e_date}T{e_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
+        return {
+            'id': asvette['Id'],
+            'summary': asvette['Subject'],
+            'location': asvette['Location'],
+            'description': asvette['Description'],
+            'start': eval(start),
+            'end': eval(end),
+        }
 
     def _get_events(self) -> pd.DataFrame:
         """
@@ -138,40 +207,6 @@ class Activity:
         df = df[['Id', 'Subject', SD_str, ST_str, ED_str, ET_str, ADE_str,
                  'Description', 'Location', 'Private']]
         df['Id'] = df['Id'].apply(lambda x: 'asvette' + 'act' + str(self.id) + 'id' + str(x))
-        return df
-
-    def _get_cal_events(self):
-        """
-            Cette fonction va chercher les sorties de l'activité sur Google Calendar
-            et les mettre en forme dans un DataFrame.
-            """
-        # Call the Calendar API
-        now: str = datetime.datetime.now().isoformat() + "Z"  # 'Z' indicates UTC time
-        try:
-            events_result = (
-                self.service.events()
-                .list(
-                    calendarId=self.cal_id,
-                    timeMin=now,
-                    singleEvents=True,
-                    orderBy="startTime",
-                )
-                .execute()
-            )
-            events = events_result.get("items", [])
-        except HttpError as error:
-            print(f"Une erreur s'est produite: {error}")
-            sys.exit(1)
-        except httplib2.error.ServerNotFoundError as error:
-            print(f"Une erreur s'est produite: {error}")
-            sys.exit(1)
-        event_list: list[list[str]] = [['Id', 'Subject', SD_str, ST_str,
-                                        ED_str, ET_str, ADE_str,
-                                        'Description', 'Location', 'Private']]
-        for event in events:
-            row = get_google_event_row(event)
-            event_list.append(row)
-        df: pd.DataFrame = pd.DataFrame(event_list[1:], columns=event_list[0])
         return df
 
 
@@ -549,6 +584,54 @@ def check_google_events(service, act: str, cal_id: str, liste_asvette: pd.DataFr
     return nb_identical, nb_different, nb_absentes
 
 
+def check_events(act: Activity, cal: GoogleCalendar) -> tuple[int, int, int]:
+    """
+    Vérifie si les événements d'une activité ASVETTE sont présents sur un calendrier Google.
+    Si un événement n'est pas présent, il est ajouté.
+    Si un événement est présent mais différent, il est mis à jour.
+    Retourne un tuple contenant:
+    - Le nombre d'événements identiques.
+    - Le nombre d'événements différents.
+    - Le nombre d'événements absents du calendrier Google.
+
+    Parameters:
+    service (googleapiclient.discovery.Resource): The Google Calendar API service.
+    act (str): The name of the activity.
+    cal_id (str): The ID of the Google Calendar.
+    liste_asvette (pd.DataFrame): The list of events from ASVETTE.
+    liste_google (pd.DataFrame): The list of events from Google Calendar.
+
+    Returns:
+    tuple[int, int, int]: A tuple containing the number of identical events, the number of
+    different events and the number of absent events.
+    """
+    nb_identical: int = 0
+    nb_different: int = 0
+    nb_absentes: int = 0
+    for index, row in act.events.iterrows():
+        event: dict = act.get_row_dict(index)
+        # Si la sortie (id) n'est pas dans le calendrier, on l'ajoute
+        if cal.events is None or row['Id'] not in liste_google['Id'].values:
+            print(f"La Sortie {row['Subject']} n'existe pas sur Google Calendar.")
+            nb_absentes += 1
+            add_google_event(service, cal_id, event)
+        # Si la sortie (id) est dans le calendrier, on compare les champs
+        else:
+            # On stocke l'index de la sortie dans le dataframe Google
+            google_index: int = (liste_google[liste_google['Id'] == row['Id']]
+                                 .index.item())
+            if diff_asvette_google(row.to_dict(),
+                                   liste_google.iloc[google_index].to_dict()):
+                print(
+                    f"La sortie {row['Subject']} de l'activité {act} "
+                    f"n'est pas la même que sur Google Calendar")
+                nb_different += 1
+                update_google_event(service, cal_id, event)
+            else:
+                nb_identical += 1
+    return nb_identical, nb_different, nb_absentes
+
+
 def main() -> None:
     credentials = get_credentials()
     service = get_service(credentials)
@@ -584,12 +667,14 @@ def tests() -> None:
     service = get_service(credentials)
     # On passe en revue les activités
     for activity, value in ACTIVITIES.items():
-        act = Activity(service, activity, value['asvette_id'], value['google_id'])
+        act = Activity(activity, value['asvette_id'], value['google_id'])
         print(f"---------\n{act.name}\n")
         if act.is_events_empty:
             print(f"Aucune sortie {act.name} trouvée")
             continue
+        cal: GoogleCalendar = GoogleCalendar(service, act.name, act.cal_id)
         print(f"Nombre de sorties asvette pour l'activité {act.name} : {act.nb_events}")
+        print(f"Nombre de sorties Google pour l'activité {cal.name} : {cal.nb_events}")
         print("")
 
 
