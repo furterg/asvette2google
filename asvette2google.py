@@ -382,22 +382,18 @@ def check_events(act: Activity, cal: GoogleCalendar) -> str:
     """
     Vérifie si les événements d'une activité ASVETTE sont présents sur un calendrier Google.
     Si un événement n'est pas présent, il est ajouté.
-    Si un événement est présent mais différent, il est mis à jour.
-    Retourne un tuple contenant:
+    Si un événement est présent, mais différent, il est mis à jour.
+    Retourne un tuple contenant :
     - Le nombre d'événements identiques.
     - Le nombre d'événements différents.
     - Le nombre d'événements absents du calendrier Google.
 
-    Parameters:
-    service (googleapiclient.discovery.Resource): The Google Calendar API service.
-    act (str): The name of the activity.
-    cal_id (str): The ID of the Google Calendar.
-    liste_asvette (pd.DataFrame): The list of events from ASVETTE.
-    liste_google (pd.DataFrame): The list of events from Google Calendar.
+    Parameters :
+    act (Activity) : Une activité ASVETTE avec ses sorties.
+    cal (GoogleCalendar) : Les événements Google Calendar correspondants é l'activité.
 
-    Returns:
-    str: A tuple containing the number of identical events, the number of
-    different events and the number of absent events.
+    Returns :
+    str : Le résultat de l'opération avec le nombre de sorties inchangées, ajoutées et mises à jour.
     """
     nb_identical: int = 0
     nb_different: int = 0
