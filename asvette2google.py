@@ -204,6 +204,7 @@ class Activity:
         else:
             start = r"{" + f"'dateTime': '{s_date}T{s_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
             end = r"{" + f"'dateTime': '{e_date}T{e_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
+        # TODO: Part of the code that needs to be updated after a decision has been made.
         asvette_id: int = int(row['Id'].split('id')[-1])
         url: str = "https://asvette.limoog.net/public/pages/info-sortie.php?id=" + str(asvette_id)
         return_dict = {
