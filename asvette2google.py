@@ -204,7 +204,9 @@ class Activity:
         else:
             start = r"{" + f"'dateTime': '{s_date}T{s_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
             end = r"{" + f"'dateTime': '{e_date}T{e_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
-        return {
+        asvette_id: int = int(row['Id'].split('id')[-1])
+        url: str = "https://asvette.limoog.net/public/pages/info-sortie.php?id=" + str(asvette_id)
+        return_dict = {
             'id': row['Id'],
             'summary': row['Subject'],
             'location': row['Location'],
@@ -212,6 +214,11 @@ class Activity:
             'start': literal_eval(start),
             'end': literal_eval(end),
         }
+        if asvette_id == 711:
+            return_dict['source'] = {'title': 'ASVETTE', 'url': url}
+            return_dict['description'] += f'<BR><a href="{url}">Inscription</a>'
+        return return_dict
+
 
     def _get_events(self) -> pd.DataFrame:
         """
@@ -445,5 +452,5 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    ic.disable()
+    ic.enable()
     main()
