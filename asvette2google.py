@@ -28,6 +28,7 @@ SCOPES: list[str] = ["https://www.googleapis.com/auth/calendar"]
 TOKEN: str = "token.json"
 
 URL: str = "https://asvel.limoog.net/public/pages/liste-sortie.php?Pass%C3%A9es=F&Activite="
+URL_SORTIE_BASE: str = "https://asvette.limoog.net/public/pages/info-sortie.php?id="
 
 ESC: str = 'l5t9lmq3d84uam9rvuvkfum4q4@group.calendar.google.com'  # Escalade
 SDF: str = 'n49a0esd948cfcdjdmli4d271o@group.calendar.google.com'  # Ski de fond
@@ -107,14 +108,16 @@ class GoogleCalendar:
         :rtype: Str
         """
         try:
-            added_event: dict = self.service.events().insert(calendarId=self.id, body=event).execute()
+            added_event: dict = self.service.events().insert(calendarId=self.id,
+                                                             body=event).execute()
             return f'Événement créé: {added_event.get("summary")}'
         except HttpError as error:
             # Si l'événement a été supprimé du calendrier. L'id existe et cela génère une erreur.
             if error.resp.status == 409:
                 return self.update_event(event)
             else:
-                return f"Une erreur s'est produite: {error}\n{event.get('summary')} n'a pas pu être ajouté."
+                return f"Une erreur s'est produite: {error}\n{event.get('summary')} n'a \
+                pas pu être ajouté."
 
     def update_event(self, event: dict) -> str:
         """
@@ -134,7 +137,8 @@ class GoogleCalendar:
                                                                body=event).execute()
             return f'Événement mis à jour: {updated_event.get("summary")}'
         except HttpError as error:
-            return f"Une erreur s'est produite: {error}\n{event.get('summary')} n'a pas pu être mis à jour."
+            return f"Une erreur s'est produite: {error}\n{event.get('summary')} n'a \
+            pas pu être mis à jour."
 
     @staticmethod
     def _get_event_row(event: dict) -> list:
@@ -204,14 +208,20 @@ class Activity:
         else:
             start = r"{" + f"'dateTime': '{s_date}T{s_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
             end = r"{" + f"'dateTime': '{e_date}T{e_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
-        return {
+        asvette_id: int = int(row['Id'].split('id')[-1])
+        url: str = URL_SORTIE_BASE + str(asvette_id)
+        source: str = r"{" + f"'title': 'ASVETTE', 'url': '{url}'" + r"}"
+        description: str = row['Description'] + f'<BR><a href="{url}">Inscription</a>'
+        return_dict = {
             'id': row['Id'],
             'summary': row['Subject'],
             'location': row['Location'],
-            'description': row['Description'],
+            'description': description,
             'start': literal_eval(start),
             'end': literal_eval(end),
+            'source': literal_eval(source),
         }
+        return return_dict
 
     def _get_events(self) -> pd.DataFrame:
         """
@@ -404,7 +414,7 @@ def check_events(act: Activity, cal: GoogleCalendar) -> str:
         if cal.events is None or row['Id'] not in cal.events['Id'].values:
             print(f"La Sortie {row['Subject']} n'existe pas sur Google Calendar.")
             nb_absentes += 1
-            print(cal.add_event(event))  # ajoute un événement et imprime le résultat de l'opération.
+            print(cal.add_event(event))  # ajoute 1 événement et imprime le résultat de l'opération.
         # Si la sortie (id) est dans le calendrier, on compare les champs.
         else:
             # On stocke l'index de la sortie dans le dataframe Google
@@ -445,5 +455,5 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    ic.disable()
+    ic.enable()
     main()
