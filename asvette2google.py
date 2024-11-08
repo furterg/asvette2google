@@ -108,16 +108,14 @@ class GoogleCalendar:
         :rtype: Str
         """
         try:
-            added_event: dict = self.service.events().insert(calendarId=self.id,
-                                                             body=event).execute()
+            added_event: dict = self.service.events().insert(calendarId=self.id, body=event).execute()
             return f'Événement créé: {added_event.get("summary")}'
         except HttpError as error:
             # Si l'événement a été supprimé du calendrier. L'id existe et cela génère une erreur.
             if error.resp.status == 409:
                 return self.update_event(event)
             else:
-                return f"Une erreur s'est produite: {error}\n{event.get('summary')} n'a \
-                pas pu être ajouté."
+                return f"Une erreur s'est produite: {error}\n{event.get('summary')} n'a pas pu être ajouté."
 
     def update_event(self, event: dict) -> str:
         """
@@ -382,8 +380,8 @@ def diff_asvette_google(asv_dict: dict, google_dict: dict) -> bool:
     for key, valeur in asv_dict.items():
         # Si la valeur ASVETTE est différente de la valeur dans le calendrier
         if valeur != google_dict[key]:
-            print('ASVETTE {key}: {valeur}\n'
-                  'GOOGLE {key}: {google_dict[key]}\n')
+            print(f'ASVETTE {key}: {valeur}\n'
+                  f'GOOGLE {key}: {google_dict[key]}\n')
             nb_diff += 1
     return True if nb_diff > 0 else False
 
