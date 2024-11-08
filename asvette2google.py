@@ -209,7 +209,7 @@ class Activity:
         asvette_id: int = int(row['Id'].split('id')[-1])
         url: str = URL_SORTIE_BASE + str(asvette_id)
         source: str = r"{" + f"'title': 'ASVETTE', 'url': '{url}'" + r"}"
-        description: str = row['Description'] + f'<BR><a href="{url}">Inscription</a>'
+        description: str = row['Description']
         return_dict = {
             'id': row['Id'],
             'summary': row['Subject'],
@@ -268,8 +268,9 @@ class Activity:
         df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
         df[ED_str] = df[ED_str].dt.strftime('%Y-%m-%d')
 
-        # On ajoute une colonne 'Description' qui correspond à Difficulté + Encadrant
-        df['Description'] = df['Difficulté'] + ' | ' + df['Encadrant']
+        # On ajoute une colonne 'Description' qui correspond à Difficulté + Encadrant + URL d'inscription
+        df['Description'] = (df['Difficulté'] + ' | ' + df['Encadrant'] + '<BR><a href="' +
+                             URL_SORTIE_BASE + df['Id'] + '">Inscription</a>')
 
         # On ajoute deux colonnes pour le bon format du CSV
         df[ET_str] = ''
@@ -381,7 +382,7 @@ def diff_asvette_google(asv_dict: dict, google_dict: dict) -> bool:
         # Si la valeur ASVETTE est différente de la valeur dans le calendrier
         if valeur != google_dict[key]:
             print(f'ASVETTE {key}: {valeur}\n'
-                  f'GOOGLE {key}: {google_dict[key]}\n')
+                  f'GOOGLE  {key}: {google_dict[key]}\n')
             nb_diff += 1
     return True if nb_diff > 0 else False
 
