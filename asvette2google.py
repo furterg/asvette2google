@@ -270,6 +270,7 @@ class Activity:
 
         # On ajoute une colonne 'Description' qui correspond à Difficulté + Encadrant
         df['Description'] = df['Difficulté'] + ' | ' + df['Encadrant']
+        df['Description'] = df['Description'] + f'<BR><a href="{URL_SORTIE_BASE}{df["Id"].values[0]}">Inscription</a>'
 
         # On ajoute deux colonnes pour le bon format du CSV
         df[ET_str] = ''
