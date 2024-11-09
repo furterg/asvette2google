@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Ce script va rechercher la liste des sorties pour chaque activité sur ASVETTE.
 I lva ensuite récupérer la liste des sorties présentes dans le calendrier Google correspondant.
@@ -5,6 +6,7 @@ En fonction des résultats :
 - On ajoute les sorties de l'activité ASVETTE qui n'existent pas sur Google Calendar.
 - On met à jour les sorties de l'activité ASVETTE qui ont changé.
 """
+import argparse
 import os
 import sys
 import time
@@ -23,7 +25,6 @@ from googleapiclient.errors import HttpError
 from icecream import ic
 import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', filename='asvette.log')
 ic.configureOutput(includeContext=True)
 
 SCOPES: list[str] = ["https://www.googleapis.com/auth/calendar"]
@@ -54,6 +55,21 @@ SD_str: str = 'Start Date'
 ST_str: str = 'Start Time'
 ET_str: str = 'End Time'
 ADE_str: str = 'All Day Event'
+
+
+def start_logging():
+    # Set up argument parsing with a default value for the log file
+    parser = argparse.ArgumentParser(description="Run the script with an optional log file path.")
+    parser.add_argument('--log', type=str, default='asvette.log',
+                        help="Absolute path to the log file (default: asvette.log)")
+    args = parser.parse_args()
+
+    # Ensure the log path is absolute
+    log_file_path = os.path.abspath(args.log)
+
+    # Set up logging
+    logging.basicConfig(filename=log_file_path, level=logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class GoogleCalendar:
@@ -428,6 +444,7 @@ def check_events(act: Activity, cal: GoogleCalendar) -> str:
 
 @timer
 def main() -> None:
+    start_logging()
     logging.info("starting...")
     credentials = get_credentials()
     service = get_service(credentials)
