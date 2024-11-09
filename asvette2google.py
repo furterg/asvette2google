@@ -126,14 +126,16 @@ class GoogleCalendar:
         :rtype: Str
         """
         try:
-            added_event: dict = self.service.events().insert(calendarId=self.id, body=event).execute()
+            added_event: dict = self.service.events().insert(calendarId=self.id,
+                                                             body=event).execute()
             logging.info(f'Événement créé: {added_event.get("summary")}')
         except HttpError as error:
             # Si l'événement a été supprimé du calendrier. L'id existe et cela génère une erreur.
             if error.resp.status == 409:
                 self.update_event(event)
             else:
-                logging.error(f"Une erreur s'est produite: {error}\n{event.get('summary')} n'a pas pu être ajouté.")
+                logging.error(f"Une erreur s'est produite: {error}\n"
+                              f"{event.get('summary')} n'a pas pu être ajouté.")
 
     def update_event(self, event: dict) -> None:
         """
@@ -286,7 +288,7 @@ class Activity:
         df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
         df[ED_str] = df[ED_str].dt.strftime('%Y-%m-%d')
 
-        # On ajoute une colonne 'Description' qui correspond à Difficulté + Encadrant + URL d'inscription
+        # On ajoute une colonne 'Description' == à Difficulté + Encadrant + URL d'inscription
         df['Description'] = (df['Difficulté'] + ' | ' + df['Encadrant'] + '<BR><a href="' +
                              URL_SORTIE_BASE + df['Id'] + '">Inscription</a>')
 
@@ -439,7 +441,8 @@ def check_events(act: Activity, cal: GoogleCalendar) -> str:
                 cal.update_event(event)
             else:
                 nb_identical += 1
-    return f"{act.name}: {nb_identical} identiques | {nb_different} mises à jour | {nb_absentes} créées"
+    return (f"{act.name}: {nb_identical} identiques | "
+            f"{nb_different} mises à jour | {nb_absentes} créées")
 
 
 @timer
