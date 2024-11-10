@@ -15,6 +15,7 @@ import requests
 import pandas as pd
 import datetime
 import httplib2
+import urllib.parse
 from ast import literal_eval
 from bs4 import BeautifulSoup
 from google.auth.transport.requests import Request
@@ -59,19 +60,59 @@ ET_str: str = 'End Time'
 ADE_str: str = 'All Day Event'
 
 
-def start_logging():
-    # Set up argument parsing with a default value for the log file
-    parser = argparse.ArgumentParser(description="Run the script with an optional log file path.")
-    parser.add_argument('--log', type=str, default='asvette.log',
-                        help="Absolute path to the log file (default: asvette.log)")
-    args = parser.parse_args()
-
-    # Ensure the log path is absolute
-    log_file_path = os.path.abspath(args.log)
-
+def start_logging(log_file_path: str):
     # Set up logging
     logging.basicConfig(filename=log_file_path, level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+class Zap:
+
+    def __init__(self, webhook: str | None):
+        self.webhook: str | None = webhook
+        self.start_time: str = datetime.datetime.now().strftime('%H:%M:%S')
+        self.end_time: str = ''
+        self.payload: dict = {
+            'start': self.start_time,
+            'end': '',
+            'result': '',
+            }
+
+    def post(self) -> None:
+        self.end_time = datetime.datetime.now().strftime('%H:%M:%S')
+        self.payload['end'] = self.end_time
+        try:
+            r = requests.post(self.webhook, data=self.payload)
+            logging.info(f"Zapier action finished with status: {r.status_code}")
+        except HttpError as e:
+            logging.error(e)
+        except TimeoutError as e:
+            logging.error(e)
+
+    def add(self, result: str) -> None:
+        self.payload['result'] += result
+
+
+class CommandLineArguments:
+
+    def __init__(self):
+        parser = argparse.ArgumentParser(description="Run the script with an optional log file path.")
+        parser.add_argument('--log', type=str, default='asvette.log',
+                            help="Chemin absolu vers le fichier de logs (défaut : asvette.log)")
+        parser.add_argument('--hook', type=str, default=None,
+                            help="URL d'un webhook Zapier qui capturera le résultat de l'automatisation.")
+        self.arguments = parser.parse_args()
+        self.log_file: str = os.path.abspath(self.arguments.log)
+        self.webhook: str | None = None if self.arguments.hook is None else self._get_zapier_hook()
+
+    def _get_zapier_hook(self) -> str | None:
+        try:
+            parsed_url = urllib.parse.urlparse(self.arguments.hook)
+
+            if parsed_url.scheme == 'https' and parsed_url.netloc == 'hooks.zapier.com':
+                return "https://hooks.zapier.com" + parsed_url.path
+        except ValueError:
+            return None
 
 
 class GoogleCalendar:
@@ -450,8 +491,10 @@ def check_events(act: Activity, cal: GoogleCalendar) -> str:
 
 @timer
 def main() -> None:
-    start_logging()
+    args: CommandLineArguments = CommandLineArguments()
+    start_logging(args.log_file)
     logging.info("starting...")
+    zap: Zap = Zap(args.webhook)
     credentials = get_credentials()
     service = get_service(credentials)
     # On passe en revue les activités
@@ -465,7 +508,11 @@ def main() -> None:
         # 2. Recherche des sorties pour l'activité sur Google Calendar
         cal: GoogleCalendar = GoogleCalendar(service, act.name, act.cal_id)
         # On passe en revue la liste des sorties pour ajout ou mise à jour du calendrier :
-        logging.info(check_events(act, cal))
+        check: str = check_events(act, cal)
+        zap.add(check + '\n')
+        logging.info(check)
+    if zap.webhook is not None:
+        zap.post()
     logging.info("Calendar update finished normally")
 
 
