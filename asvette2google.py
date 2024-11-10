@@ -27,8 +27,10 @@ import logging
 
 ic.configureOutput(includeContext=True)
 
+SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
+
 SCOPES: list[str] = ["https://www.googleapis.com/auth/calendar"]
-TOKEN: str = "token.json"
+TOKEN: str = os.path.join(SCRIPT_PATH, "token.json")
 
 URL: str = "https://asvel.limoog.net/public/pages/liste-sortie.php?Pass%C3%A9es=F&Activite="
 URL_SORTIE_BASE: str = "https://asvette.limoog.net/public/pages/info-sortie.php?id="
@@ -349,6 +351,7 @@ def get_credentials():
     token.json.
     """
     creds = None
+    cred_file: str = os.path.join(SCRIPT_PATH, 'credentials.json')
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
     # time.
@@ -360,7 +363,7 @@ def get_credentials():
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json", SCOPES
+                cred_file, SCOPES
             )
             creds = flow.run_local_server(port=0)
         # Save the credentials for the next run
