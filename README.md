@@ -34,10 +34,19 @@ Ce script va rechercher la liste des sorties pour chaque activité sur ASVETTE e
 Exécutez le script en exécutant la commande suivante :
 
 ```shell
-python3 asvette2google.py
+python3 asvette2google.py [--log <log_file>] [--hook <webhook_url>]
 ```
 
-Le nouveau programme fait les choses suivantes pour chaque activité :
+* --log : spécifie le chemin absolu vers le fichier de logs (défaut : asvette.log dans le dossier du script)
+* --hook : spécifie l'URL d'un webhook Zapier qui capturera le résultat de l'automatisation (facultatif)
+
+Exemple :
+
+```shell
+python asvette2google.py --log /var/log/asvette.log --hook https://zapier.com/hooks/1234567890
+```
+
+Le script fait les choses suivantes pour chaque activité :
 
 1. Récupère la liste de sorties sur ASVETTE.
 2. Récupère la liste des sorties sur le calendrier Google correspondant.
