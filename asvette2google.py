@@ -178,7 +178,7 @@ class GoogleCalendar:
                 self.update_event(event)
             else:
                 logging.error(f"Une erreur s'est produite: {error}\n"
-                              f"{event.get('summary')} n'a pas pu être ajouté.")
+                              f"{event.get('summary')} n'a pas pu être ajouté.\n{event}")
 
     def update_event(self, event: dict) -> None:
         """
@@ -199,7 +199,7 @@ class GoogleCalendar:
             logging.info(f'Événement mis à jour: {updated_event.get("summary")}')
         except HttpError as error:
             logging.error(f"Une erreur s'est produite: {error}\n{event.get('summary')} n'a \
-            pas pu être mis à jour.")
+            pas pu être mis à jour.\n{event}")
 
     @staticmethod
     def _get_event_row(event: dict) -> list:
@@ -267,8 +267,8 @@ class Activity:
             start: str = r"{" + f"'date': '{s_date}', 'timeZone': 'Europe/Paris'" + r"}"
             end: str = r"{" + f"'date': '{e_date}', 'timeZone': 'Europe/Paris'" + r"}"
         else:
-            start = r"{" + f"'dateTime': '{s_date}T{s_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
-            end = r"{" + f"'dateTime': '{e_date}T{e_time}:00', 'timeZone': 'Europe/Paris'" + r"}"
+            start = r"{" + f"'dateTime': '{s_date}T{s_time}', 'timeZone': 'Europe/Paris'" + r"}"
+            end = r"{" + f"'dateTime': '{e_date}T{e_time}', 'timeZone': 'Europe/Paris'" + r"}"
         asvette_id: int = int(row['Id'].split('id')[-1])
         url: str = URL_SORTIE_BASE + str(asvette_id)
         source: str = r"{" + f"'title': 'ASVETTE', 'url': '{url}'" + r"}"
