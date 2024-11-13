@@ -454,11 +454,14 @@ def diff_asvette_google(asv_dict: dict, google_dict: dict) -> bool:
     Returns:
     bool: True if there is a difference between the two events, False otherwise
     """
+    log_line: str = asv_dict['Subject']
     nb_diff: int = 0
     for key, valeur in asv_dict.items():
         # Si la valeur ASVETTE est différente de la valeur dans le calendrier
         if valeur != google_dict[key]:
+            log_line += f' | {key}: {valeur} != {google_dict[key]}'
             nb_diff += 1
+    logging.info(log_line)
     return True if nb_diff > 0 else False
 
 
