@@ -284,6 +284,27 @@ class Activity:
         }
         return return_dict
 
+    @staticmethod
+    def _get_rows(table) -> pd.DataFrame | None:
+        # On récupère les en-têtes du tableau
+        headers: list = [header.text.strip() for header in table.find_all("th")]
+        rows: list = []
+        for row in table.find_all("tr"):
+            row_data: list = [cell.text.strip() for cell in row.find_all("td")]
+            if row_data:
+                rows.append(row_data)
+                # print(f"ASVETTE: {row_data[1]}, date: {row_data[3]}")
+        # On transforme le tableau en DataFrame
+        df: pd.DataFrame = pd.DataFrame(rows, columns=headers)
+        return df
+
+    @staticmethod
+    def _parse_time(x):
+        if x == '':
+            return pd.NaT
+        else:
+            return pd.to_datetime(x, format='%H:%M')
+
     def _get_events(self) -> pd.DataFrame:
         """
         Cette fonction va rechercher la liste des sorties pour chaque activité sur ASVETTE et mettre
@@ -300,24 +321,15 @@ class Activity:
 
         # On récupère le tableau des sorties
         table = soup.find("table", {"id": "table_sortie"})
-        # On récupère les en-têtes du tableau
-        headers: list = [header.text.strip() for header in table.find_all("th")]
 
         # On récupère les données du tableau
-        rows: list = []
-        for row in table.find_all("tr"):
-            row_data: list = [cell.text.strip() for cell in row.find_all("td")]
-            if row_data:
-                rows.append(row_data)
-                # print(f"ASVETTE: {row_data[1]}, date: {row_data[3]}")
-        # On transforme le tableau en DataFrame
-        df: pd.DataFrame = pd.DataFrame(rows, columns=headers)
+        df: pd.DataFrame = self._get_rows(table)
         if df.empty:
             return df
-
         # On transforme la colonne 'Date' en datetime
         df['Date'] = pd.to_datetime(df['Date'])
         # On transforme la colonne 'Départ' en datetime
+        df['Heure'] = df['Heure'].apply(self._parse_time)
         df['Heure'] = pd.to_datetime(df['Heure'], format='%H:%M:%S', errors='coerce').dt.time
 
         first_char: str = 'Durée_first_char'
