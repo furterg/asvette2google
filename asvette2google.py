@@ -246,6 +246,8 @@ class Activity:
         self.name: str = name
         self.id: int = asvette_id
         self.cal_id: str = calendar_id
+        self.url: str = URL + str(self.id)  # URL pour ASVETTE
+        self.table = self._get_html_table()
         self.events: pd.DataFrame = self._get_events()
         self.nb_events: int = self.events.shape[0]
         self.is_events_empty: bool = self.events.empty
@@ -305,6 +307,15 @@ class Activity:
         else:
             return pd.to_datetime(x, format='%H:%M')
 
+    def _get_html_table(self):
+        # Send a GET request to the webpage
+        response: requests.Response = requests.get(self.url)
+        # Create a BeautifulSoup object from the response content
+        soup: BeautifulSoup = BeautifulSoup(response.content, "html.parser")
+
+        # On récupère le tableau des sorties
+        return soup.find("table", {"id": "table_sortie"})
+
     def _get_events(self) -> pd.DataFrame:
         """
         Cette fonction va rechercher la liste des sorties pour chaque activité sur ASVETTE et mettre
@@ -312,18 +323,8 @@ class Activity:
         Si le dataframe est vide, on le retourne directement.
         S'il y a des sorties, on met en forme le Dataframe et on le retourne.
         """
-        # URL pour ASVETTE
-        url: str = URL + str(self.id)
-        # Send a GET request to the webpage
-        response: requests.Response = requests.get(url)
-        # Create a BeautifulSoup object from the response content
-        soup: BeautifulSoup = BeautifulSoup(response.content, "html.parser")
-
-        # On récupère le tableau des sorties
-        table = soup.find("table", {"id": "table_sortie"})
-
         # On récupère les données du tableau
-        df: pd.DataFrame = self._get_rows(table)
+        df: pd.DataFrame = self._get_rows(self.table)
         if df.empty:
             return df
         # On transforme la colonne 'Date' en datetime
