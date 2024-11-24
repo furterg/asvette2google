@@ -18,6 +18,7 @@ import httplib2
 import urllib.parse
 from ast import literal_eval
 from bs4 import BeautifulSoup
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -396,7 +397,7 @@ def timer(func):
     return wrapper
 
 
-def get_credentials():
+def get_credentials(zap: Zap):
     """
     Retourne les credentials pour accéder aux APIs Google.
 
@@ -410,7 +411,17 @@ def get_credentials():
     # created automatically when the authorization flow completes for the first
     # time.
     if os.path.exists(TOKEN):
-        creds = Credentials.from_authorized_user_file(TOKEN, SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file(TOKEN, SCOPES)
+        except RefreshError:
+            msg: str = "Le token est invalide. Il faudra se reconnecter."
+            logging.warning(msg)
+            if zap.webhook is not None:
+                zap.add(msg)
+                zap.post()
+
+            creds = None
+            sys.exit(2)
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -511,7 +522,7 @@ def main() -> None:
     start_logging(args.log_file)
     logging.info("starting...")
     zap: Zap = Zap(args.webhook)
-    credentials = get_credentials()
+    credentials = get_credentials(zap)
     service = get_service(credentials)
     # On passe en revue les activités
     for activity, value in ACTIVITIES.items():
