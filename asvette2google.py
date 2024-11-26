@@ -336,7 +336,7 @@ class Activity:
 
         first_char: str = 'Durée_first_char'
         # On extrait le nombre de jours de la colonne 'Durée'
-        df[first_char] = df['Durée'].apply(lambda x: int(x.split(' ')[0]) - 1)
+        df[first_char] = df['Durée'].apply(lambda x: int(x.split(' ')[0]))
         # On ajoute le nombre de jours pour créer la colonne 'End Date'
         df[ED_str] = df.apply(lambda ligne: ligne['Date'] + pd.DateOffset(days=ligne[first_char]),
                               axis=1)
