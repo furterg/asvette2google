@@ -24,6 +24,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from pandas.tseries.offsets import DateOffset
 from icecream import ic
 import logging
 
@@ -338,7 +339,7 @@ class Activity:
         # On extrait le nombre de jours de la colonne 'Durée'
         df[first_char] = df['Durée'].apply(lambda x: int(x.split(' ')[0] - 1))
         # On ajoute le nombre de jours pour créer la colonne 'End Date'
-        df[ED_str] = df.apply(lambda ligne: ligne['Date'] + pd.DateOffset(days=ligne[first_char]),
+        df[ED_str] = df.apply(lambda ligne: ligne['Date'] + DateOffset(days=ligne[first_char]),
                               axis=1)
         # On supprime la colonne 'Durée_first_char', plus besoin.
         df = df.drop(first_char, axis=1)
