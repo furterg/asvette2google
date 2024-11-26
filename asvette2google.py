@@ -24,7 +24,6 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from pandas.tseries.offsets import DateOffset
 from icecream import ic
 import logging
 
@@ -78,7 +77,7 @@ class Zap:
             'start': self.start_time,
             'end': '',
             'result': '',
-            }
+        }
 
     def post(self) -> None:
         self.end_time = datetime.datetime.now().strftime('%H:%M:%S')
@@ -338,14 +337,6 @@ class Activity:
         first_char: str = 'Durée_first_char'
         # On extrait le nombre de jours de la colonne 'Durée'
         df[first_char] = df['Durée'].apply(lambda x: int(x.split(' ')[0]) - 1)
-        # On ajoute le nombre de jours pour créer la colonne 'End Date'
-        df[ED_str] = df.apply(lambda ligne: ligne['Date'] + DateOffset(days=ligne[first_char]),
-                              axis=1)
-        # On supprime la colonne 'Durée_first_char', plus besoin.
-        df = df.drop(first_char, axis=1)
-        df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
-        df[ED_str] = df[ED_str].dt.strftime('%Y-%m-%d')
-
         # On ajoute une colonne 'Description' == à Difficulté + Encadrant + URL d'inscription
         df['Description'] = (df['Difficulté'] + ' | ' + df['Encadrant'] + '<BR><a href="' +
                              URL_SORTIE_BASE + df['Id'] + '">Inscription</a>')
@@ -363,6 +354,17 @@ class Activity:
         # est avant 10h00.
         df[ADE_str] = df['Heure'].apply(
             lambda x: 'TRUE' if pd.isnull(x) or x < pd.to_datetime('10:00:00').time() else 'FALSE')
+
+        # On ajoute le nombre de jours pour créer la colonne 'End Date'
+        df[ED_str] = df.apply(lambda ligne: ligne['Date'] +
+                                            pd.DateOffset(
+                                                days=ligne[first_char] + 1 if ligne[ADE_str] == 'TRUE' else ligne[
+                                                    first_char]), axis=1)
+        # On supprime la colonne 'Durée_first_char', plus besoin.
+        df = df.drop(first_char, axis=1)
+        df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
+        df[ED_str] = df[ED_str].dt.strftime('%Y-%m-%d')
+
         df['Heure'] = df['Heure'].apply(
             lambda x: x.strftime('%H:%M:%S') if not pd.isnull(x) else '')
         df[ET_str] = df[ET_str].apply(lambda x: x.strftime('%H:%M:%S') if x else '')
